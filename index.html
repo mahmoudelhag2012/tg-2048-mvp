@@ -92,6 +92,10 @@ function rotate(times){
    right=> rotate(2) then slide, then rotate(2)
    down => rotate(1) then slide, then rotate(3)
    left => no rotation
+*//* ===== الاتجاهات المصححة =====
+   dir: 0 left, 1 up, 2 right, 3 down
+   فوق = rotate(3) قبل السحب، ثم rotate(1) للرجوع
+   تحت = rotate(1) قبل السحب، ثم rotate(3) للرجوع
 */
 function move(dir){
   const before = JSON.stringify(grid);
@@ -121,6 +125,7 @@ function move(dir){
     draw();
     if (gameOver()) endGame();
   }
+}
 }
 
 function gameOver(){
