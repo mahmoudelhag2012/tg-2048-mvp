@@ -42,7 +42,7 @@
 
 <script>
 /* ===== Telegram ===== */
-const tg = window.Telegram?.WebApp; if (tg) { tg.expand(); }
+const tg = window.Telegram?.WebApp; if (tg) tg.expand();
 
 /* ===== Game State ===== */
 const size=4; let grid=[], score=0, best=+localStorage.getItem('best2048')||0;
@@ -52,6 +52,7 @@ function emptyGrid(){grid=Array.from({length:size},()=>Array(size).fill(0));}
 function randomEmpty(){const e=[]; for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(!grid[r][c])e.push([r,c]); return e.length?e[Math.floor(Math.random()*e.length)]:null;}
 function addTile(){const pos=randomEmpty(); if(!pos) return false; grid[pos[0]][pos[1]] = Math.random()<0.9?2:4; return true;}
 function setup(){emptyGrid(); addTile(); addTile(); score=0; draw();}
+
 function draw(){
   gridEl.innerHTML=''; scoreEl.textContent=score; bestEl.textContent=best;
   for(let r=0;r<size;r++)for(let c=0;c<size;c++){
@@ -81,23 +82,42 @@ function rotate(times){
     grid=g;
   }
 }
-function move(dir){ // 0: left, 1: up, 2: right, 3: down
-  const before=JSON.stringify(grid);
-  if(dir===0){ /* left */ }
-  else if(dir===1){ rotate(1);} // up
-  else if(dir===2){ rotate(2);} // right
-  else if(dir===3){ rotate(3);} // down
 
-  for(let r=0;r<size;r++){ grid[r]=slide(grid[r]); }
+/* ===== الاتجاهات المصححة =====
+   dir: 0 left, 1 up, 2 right, 3 down
+   فوق = rotate(3) قبل السحب، ثم rotate(1) للرجوع
+   تحت = rotate(1) قبل السحب، ثم rotate(3) للرجوع
+*/
+function move(dir){
+  const before = JSON.stringify(grid);
 
-  if(dir===0){ /* left */ }
-  else if(dir===1){ rotate(3);} 
-  else if(dir===2){ rotate(2);} 
-  else if(dir===3){ rotate(1);} 
+  if (dir === 2) {         // right
+    rotate(2);
+  } else if (dir === 1) {  // up
+    rotate(3);
+  } else if (dir === 3) {  // down
+    rotate(1);
+  }
 
-  const after=JSON.stringify(grid);
-  if(before!==after){ addTile(); updateBest(); draw(); if(gameOver()) endGame(); }
+  for (let r = 0; r < size; r++) grid[r] = slide(grid[r]);
+
+  if (dir === 2) {
+    rotate(2);
+  } else if (dir === 1) {
+    rotate(1);
+  } else if (dir === 3) {
+    rotate(3);
+  }
+
+  const after = JSON.stringify(grid);
+  if (before !== after) {
+    addTile();
+    updateBest();
+    draw();
+    if (gameOver()) endGame();
+  }
 }
+
 function gameOver(){
   if(randomEmpty()) return false;
   for(let r=0;r<size;r++)for(let c=0;c<size;c++){
@@ -109,55 +129,19 @@ function gameOver(){
 }
 function updateBest(){ if(score>best){ best=score; localStorage.setItem('best2048', best); }}
 
-/* ===== Inputs (Swipe + Keyboard) ===== */
-const THRESHOLD = 20;           
-let dragging = false;
-let startX = 0, startY = 0;
-
-function touchStart(e){
-  const t = e.touches ? e.touches[0] : e;
-  dragging = true;
-  startX = t.clientX;
-  startY = t.clientY;
-}
-function touchMove(e){ if(dragging) e.preventDefault(); }
+/* ===== Inputs ===== */
+const startPos={x:0,y:0}; let dragging=false;
+function touchStart(e){dragging=true; const t=e.touches?e.touches[0]:e; startPos.x=t.clientX; startPos.y=t.clientY;}
 function touchEnd(e){
-  if(!dragging) return;
-  dragging = false;
-  const t = e.changedTouches ? e.changedTouches[0] : e;
-  const dx = t.clientX - startX;
-  const dy = t.clientY - startY;
-
-  if (Math.max(Math.abs(dx), Math.abs(dy)) < THRESHOLD) return;
-
-  if (Math.abs(dx) > Math.abs(dy)) {
-    move(dx > 0 ? 2 : 0);   // يمين / يسار
-  } else {
-    move(dy > 0 ? 3 : 1);   // تحت / فوق
-  }
+  if(!dragging) return; dragging=false;
+  const t=e.changedTouches?e.changedTouches[0]:e;
+  const dx=t.clientX-startPos.x, dy=t.clientY-startPos.y;
+  if(Math.abs(dx)>Math.abs(dy)){ move(dx>0?2:0); } else { move(dy>0?3:1); }
 }
-const gridElEl = document.getElementById('grid');
-gridElEl.addEventListener('touchstart', touchStart, {passive:false});
-gridElEl.addEventListener('touchmove',  touchMove,  {passive:false});
-gridElEl.addEventListener('touchend',   touchEnd);
-gridElEl.addEventListener('mousedown',  touchStart);
-gridElEl.addEventListener('mousemove',  touchMove);
-gridElEl.addEventListener('mouseup',    touchEnd);
-
-document.getElementById('left').onclick  = () => move(0);
-document.getElementById('up').onclick    = () => move(1);
-document.getElementById('right').onclick = () => move(2);
-document.getElementById('down').onclick  = () => move(3);
-
-window.addEventListener('keydown', (e) => {
-  switch (e.key) {
-    case 'ArrowLeft':  e.preventDefault(); move(0); break;
-    case 'ArrowUp':    e.preventDefault(); move(1); break;
-    case 'ArrowRight': e.preventDefault(); move(2); break;
-    case 'ArrowDown':  e.preventDefault(); move(3); break;
-  }
-});
-
+document.getElementById('left').onclick=()=>move(0);
+document.getElementById('up').onclick=()=>move(1);
+document.getElementById('right').onclick=()=>move(2);
+document.getElementById('down').onclick=()=>move(3);
 document.getElementById('new').onclick=()=>setup();
 document.getElementById('about').onclick=()=>alert('2048 Mini — MVP.');
 document.getElementById('share').onclick=()=>{
@@ -165,26 +149,23 @@ document.getElementById('share').onclick=()=>{
   if(navigator.share){navigator.share({text});}
   else {prompt('انسخ وشارك نتيجتك:', text);}
 };
+gridEl.addEventListener('touchstart',touchStart); gridEl.addEventListener('touchend',touchEnd);
+gridEl.addEventListener('mousedown',touchStart); gridEl.addEventListener('mouseup',touchEnd);
 
-/* ===== AdsGram ===== */
+/* ===== AdsGram: init + إعلان نهاية اللعبة ===== */
 let AdController = null;
-window.Adsgram && (AdController = window.Adsgram.init({ blockId: "int-14155" }));
-
+if (window.Adsgram && typeof window.Adsgram.init === "function") {
+  AdController = window.Adsgram.init({ blockId: "int-14155" });
+}
 function showInterstitialAd(){
-  if (!window.Adsgram || !AdController || typeof AdController.show !== "function") {
-    return Promise.resolve();
-  }
-  return AdController.show()
-    .then(res => { console.log("Ad shown/closed:", res); })
-    .catch(err => { console.warn("Ad show error:", err); });
+  if (!AdController || typeof AdController.show !== "function") return Promise.resolve();
+  return AdController.show().catch(()=>{});
 }
-
 function endGame(){
-  showInterstitialAd().finally(()=>{
-    alert('انتهت اللعبة! نتيجتك: ' + score);
-  });
+  showInterstitialAd().finally(()=> alert('انتهت اللعبة! نتيجتك: ' + score));
 }
 
+/* ===== Start ===== */
 setup();
 </script>
 </body>
