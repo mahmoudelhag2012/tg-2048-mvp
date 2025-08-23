@@ -45,7 +45,7 @@
 
 <script>
 /* ===== Telegram ===== */
-const tg = window.Telegram?.WebApp; if (tg) { tg.expand(); }
+const tg = window.Telegram?.WebApp; if (tg) tg.expand();
 
 /* ===== Game state ===== */
 const size=4; let grid=[], score=0, best=+localStorage.getItem('best2048')||0;
@@ -81,44 +81,46 @@ function slide(row){
 function rotate(times){
   for(let t=0;t<times;t++){
     const g=Array.from({length:size},()=>Array(size).fill(0));
-    // 90° clockwise
-    for(let r=0;r<size;r++)for(let c=0;c<size;c++) g[c][size-1-r]=grid[r][c];
+    for(let r=0;r<size;r++)for(let c=0;c<size;c++) g[c][size-1-r]=grid[r][c]; // 90° CW
     grid=g;
   }
 }
 
-/* dir: 0=left, 1=up, 2=right, 3=down
-   FINAL mapping:
-   - left:  no rotation
-   - up:    rotate(3) then slide-left, then rotate(1)
-   - right: rotate(2) then slide-left, then rotate(2)
-   - down:  rotate(1) then slide-left, then rotate(3)
+/* ===== Directions (from your snippet) =====
+   dir: 0 left, 1 up, 2 right, 3 down
+   up   => rotate(3) then slide, then rotate(1)
+   right=> rotate(2) then slide, then rotate(2)
+   down => rotate(1) then slide, then rotate(3)
+   left => no rotation
 */
 function move(dir){
-  const before=JSON.stringify(grid);
+  const before = JSON.stringify(grid);
 
-  if (dir===1){         // up
-    rotate(3);          // CCW
-  } else if (dir===2){  // right
+  if (dir === 2) {         // right
     rotate(2);
-  } else if (dir===3){  // down
-    rotate(1);          // CW
+  } else if (dir === 1) {  // up
+    rotate(3);
+  } else if (dir === 3) {  // down
+    rotate(1);
   }
-  // left (0): no rotation
 
-  for(let r=0;r<size;r++){ grid[r]=slide(grid[r]); }
+  for (let r = 0; r < size; r++) grid[r] = slide(grid[r]);
 
-  if (dir===1){
-    rotate(1);          // undo up
-  } else if (dir===2){
-    rotate(2);          // undo right
-  } else if (dir===3){
-    rotate(3);          // undo down
+  if (dir === 2) {
+    rotate(2);
+  } else if (dir === 1) {
+    rotate(1);
+  } else if (dir === 3) {
+    rotate(3);
   }
-  // left: no undo
 
-  const after=JSON.stringify(grid);
-  if(before!==after){ addTile(); updateBest(); draw(); if(gameOver()) endGame(); }
+  const after = JSON.stringify(grid);
+  if (before !== after) {
+    addTile();
+    updateBest();
+    draw();
+    if (gameOver()) endGame();
+  }
 }
 
 function gameOver(){
@@ -133,30 +135,20 @@ function gameOver(){
 function updateBest(){ if(score>best){ best=score; localStorage.setItem('best2048', best); }}
 
 /* ===== Input (swipe/buttons) ===== */
-const startPos={x:0,y:0}; let dragging=false; const TH=18;
-
-function touchStart(e){
-  dragging=true; const t=e.touches?e.touches[0]:e;
-  startPos.x=t.clientX; startPos.y=t.clientY;
-}
+const startPos={x:0,y:0}; let dragging=false;
+function touchStart(e){dragging=true; const t=e.touches?e.touches[0]:e; startPos.x=t.clientX; startPos.y=t.clientY;}
 function touchEnd(e){
   if(!dragging) return; dragging=false;
   const t=e.changedTouches?e.changedTouches[0]:e;
   const dx=t.clientX-startPos.x, dy=t.clientY-startPos.y;
-  if(Math.abs(dx) < TH && Math.abs(dy) < TH) return;
-  if(Math.abs(dx)>Math.abs(dy)){
-    move(dx>0?2:0);      // right : left
-  }else{
-    move(dy>0?3:1);      // down : up
-  }
+  if(Math.abs(dx)>Math.abs(dy)){ move(dx>0?2:0); } else { move(dy>0?3:1); }
 }
-
 document.getElementById('left').onclick=()=>move(0);
 document.getElementById('up').onclick=()=>move(1);
 document.getElementById('right').onclick=()=>move(2);
 document.getElementById('down').onclick=()=>move(3);
 document.getElementById('new').onclick=()=>setup();
-document.getElementById('about').onclick=()=>alert('2048 Mini — MVP build.');
+document.getElementById('about').onclick=()=>alert('2048 Mini — MVP.');
 document.getElementById('share').onclick=()=>{
   const text=`I scored ${score} in 2048 Mini!`;
   if(navigator.share){navigator.share({text});}
@@ -167,17 +159,15 @@ gridEl.addEventListener('mousedown',touchStart); gridEl.addEventListener('mouseu
 
 /* ===== AdsGram (show at game over) ===== */
 let AdController = null;
-if (window.Adsgram && typeof window.Adsgram.init === 'function') {
+if (window.Adsgram && typeof window.Adsgram.init === "function") {
   AdController = window.Adsgram.init({ blockId: "int-14155" });
 }
 function showInterstitialAd(){
-  if (!AdController || typeof AdController.show !== 'function') return Promise.resolve();
+  if (!AdController || typeof AdController.show !== "function") return Promise.resolve();
   return AdController.show().catch(()=>{});
 }
 function endGame(){
-  showInterstitialAd().finally(()=>{
-    alert('Game over! Your score: ' + score);
-  });
+  showInterstitialAd().finally(()=> alert('Game over! Your score: ' + score));
 }
 
 /* Start */
