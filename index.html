@@ -81,7 +81,7 @@ function slide(row){
 function rotate(times){
   for(let t=0;t<times;t++){
     const g=Array.from({length:size},()=>Array(size).fill(0));
-    for(let r=0;r<size;r++)for(let c=0;c<size;c++) g[c][size-1-r]=grid[r][c];
+    for(let r=0;r<size;r++)for(let c=0;c<size;c++) g[c][size-1-r]=grid[r][c]; // 90° CW
     grid=g;
   }
 }
@@ -89,9 +89,27 @@ function rotate(times){
 /* dir: 0=left, 1=up, 2=right, 3=down */
 function move(dir){
   const before=JSON.stringify(grid);
-  if(dir===2){rotate(2);} else if(dir===1){rotate(1);} else if(dir===3){rotate(3);} // make movement be "left"
+
+  // map each direction to rotations so we always slide LEFT
+  if (dir===2){            // RIGHT
+    rotate(2);
+  } else if (dir===1){     // UP
+    rotate(3);             // CCW
+  } else if (dir===3){     // DOWN
+    rotate(1);             // CW
+  }
+
   for(let r=0;r<size;r++){ grid[r]=slide(grid[r]); }
-  if(dir===2){rotate(2);} else if(dir===1){rotate(3);} else if(dir===3){rotate(1);} // rotate back
+
+  // rotate back
+  if (dir===2){
+    rotate(2);
+  } else if (dir===1){
+    rotate(1);
+  } else if (dir===3){
+    rotate(3);
+  }
+
   const after=JSON.stringify(grid);
   if(before!==after){ addTile(); updateBest(); draw(); if(gameOver()) endGame(); }
 }
@@ -120,9 +138,9 @@ function touchEnd(e){
   const dx=t.clientX-startPos.x, dy=t.clientY-startPos.y;
   if(Math.abs(dx) < TH && Math.abs(dy) < TH) return;
   if(Math.abs(dx)>Math.abs(dy)){
-    move(dx>0?2:0);
+    move(dx>0?2:0);      // right : left
   }else{
-    move(dy>0?3:1);
+    move(dy>0?3:1);      // down : up
   }
 }
 
