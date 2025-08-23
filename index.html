@@ -185,7 +185,7 @@ function showRewardAd(){
     });
 }
 
-/* ✅ reviveBoard: نفك الزنقة عشان يقدر يكمل بعد الريوارد */
+/* ✅ reviveBoard: نفك الزنقة عشان يقدر يكمل بعد الريوارد (بدون addTile) */
 function reviveBoard(){
   const filled=[];
   for(let r=0;r<size;r++) for(let c=0;c<size;c++){
@@ -193,13 +193,13 @@ function reviveBoard(){
   }
   if(filled.length){
     const [rr,cc]=filled[Math.floor(Math.random()*filled.length)];
-    grid[rr][cc]=0;
+    grid[rr][cc]=0; // فضّينا خانة واحدة بس
   }
-  addTile();
+  // لا تضيف addTile هنا — نخلي خانة فاضية عشان يبقى في حركة
   updateBest();
 }
 
-/* ✅ endGame: ربطنا السيناريو (Reward أولاً، ولو فشل/رفض → Interstitial) */
+/* ✅ endGame: Reward أولاً (مرّة واحدة)، ولو فشل/رفض → Interstitial */
 function endGame(){
   if (!continuedOnce && RewardController) {
     const wantContinue = confirm("Game over! Your score: " + score + "\n\nWatch an ad to continue?");
