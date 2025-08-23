@@ -109,19 +109,55 @@ function gameOver(){
 }
 function updateBest(){ if(score>best){ best=score; localStorage.setItem('best2048', best); }}
 
-/* ===== Inputs ===== */
-const startPos={x:0,y:0}; let dragging=false;
-function touchStart(e){dragging=true; const t=e.touches?e.touches[0]:e; startPos.x=t.clientX; startPos.y=t.clientY;}
-function touchEnd(e){
-  if(!dragging) return; dragging=false;
-  const t=e.changedTouches?e.changedTouches[0]:e;
-  const dx=t.clientX-startPos.x, dy=t.clientY-startPos.y;
-  if(Math.abs(dx)>Math.abs(dy)){ move(dx>0?2:0); } else { move(dy>0?3:1); }
+/* ===== Inputs (Swipe + Keyboard) ===== */
+const THRESHOLD = 20;           
+let dragging = false;
+let startX = 0, startY = 0;
+
+function touchStart(e){
+  const t = e.touches ? e.touches[0] : e;
+  dragging = true;
+  startX = t.clientX;
+  startY = t.clientY;
 }
-document.getElementById('left').onclick=()=>move(0);
-document.getElementById('up').onclick=()=>move(1);
-document.getElementById('right').onclick=()=>move(2);
-document.getElementById('down').onclick=()=>move(3);
+function touchMove(e){ if(dragging) e.preventDefault(); }
+function touchEnd(e){
+  if(!dragging) return;
+  dragging = false;
+  const t = e.changedTouches ? e.changedTouches[0] : e;
+  const dx = t.clientX - startX;
+  const dy = t.clientY - startY;
+
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < THRESHOLD) return;
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    move(dx > 0 ? 2 : 0);   // يمين / يسار
+  } else {
+    move(dy > 0 ? 3 : 1);   // تحت / فوق
+  }
+}
+const gridElEl = document.getElementById('grid');
+gridElEl.addEventListener('touchstart', touchStart, {passive:false});
+gridElEl.addEventListener('touchmove',  touchMove,  {passive:false});
+gridElEl.addEventListener('touchend',   touchEnd);
+gridElEl.addEventListener('mousedown',  touchStart);
+gridElEl.addEventListener('mousemove',  touchMove);
+gridElEl.addEventListener('mouseup',    touchEnd);
+
+document.getElementById('left').onclick  = () => move(0);
+document.getElementById('up').onclick    = () => move(1);
+document.getElementById('right').onclick = () => move(2);
+document.getElementById('down').onclick  = () => move(3);
+
+window.addEventListener('keydown', (e) => {
+  switch (e.key) {
+    case 'ArrowLeft':  e.preventDefault(); move(0); break;
+    case 'ArrowUp':    e.preventDefault(); move(1); break;
+    case 'ArrowRight': e.preventDefault(); move(2); break;
+    case 'ArrowDown':  e.preventDefault(); move(3); break;
+  }
+});
+
 document.getElementById('new').onclick=()=>setup();
 document.getElementById('about').onclick=()=>alert('2048 Mini — MVP.');
 document.getElementById('share').onclick=()=>{
@@ -129,10 +165,8 @@ document.getElementById('share').onclick=()=>{
   if(navigator.share){navigator.share({text});}
   else {prompt('انسخ وشارك نتيجتك:', text);}
 };
-gridEl.addEventListener('touchstart',touchStart); gridEl.addEventListener('touchend',touchEnd);
-gridEl.addEventListener('mousedown',touchStart); gridEl.addEventListener('mouseup',touchEnd);
 
-/* ===== AdsGram: init + عرض الإعلان عند نهاية اللعبة ===== */
+/* ===== AdsGram ===== */
 let AdController = null;
 window.Adsgram && (AdController = window.Adsgram.init({ blockId: "int-14155" }));
 
