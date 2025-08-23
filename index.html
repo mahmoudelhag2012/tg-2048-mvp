@@ -79,5 +79,24 @@ gridEl.addEventListener('touchstart',touchStart); gridEl.addEventListener('touch
 gridEl.addEventListener('mousedown',touchStart); gridEl.addEventListener('mouseup',touchEnd);
 setup();
 </script>
+    ...
+  <!-- باقي محتوى اللعبة -->
+
+  <!-- Adsgram interstitial -->
+  <script>
+    (function () {
+      var s = document.createElement("script");
+      s.src = "https://adsgram.ai/js/ad.js";
+      s.async = true;
+      s.onload = function () {
+        if (window.Adsgram && typeof window.Adsgram.init === "function") {
+          window.Adsgram.init({
+            blockId: "int-14154" // ده Block ID بتاعك
+          });
+        }
+      };
+      document.body.appendChild(s);
+    })();
+  </script>
 </body>
 </html>
