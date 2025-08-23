@@ -48,10 +48,13 @@ const tg = window.Telegram?.WebApp; if (tg) tg.expand();
 const size=4; let grid=[], score=0, best=+localStorage.getItem('best2048')||0;
 const gridEl=document.getElementById('grid'); const scoreEl=document.getElementById('score'); const bestEl=document.getElementById('best');
 
+/* ✅ فرصة متابعة واحدة لكل جولة */
+let continuedOnce = false;
+
 function emptyGrid(){grid=Array.from({length:size},()=>Array(size).fill(0));}
 function randomEmpty(){const e=[]; for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(!grid[r][c])e.push([r,c]); return e.length?e[Math.floor(Math.random()*e.length)]:null;}
 function addTile(){const pos=randomEmpty(); if(!pos) return false; grid[pos[0]][pos[1]] = Math.random()<0.9?2:4; return true;}
-function setup(){emptyGrid(); addTile(); addTile(); score=0; draw();}
+function setup(){emptyGrid(); addTile(); addTile(); score=0; continuedOnce=false; draw();}
 
 function draw(){
   gridEl.innerHTML=''; scoreEl.textContent=score; bestEl.textContent=best;
@@ -161,9 +164,6 @@ function showInterstitialAd(){
   if (!AdController || typeof AdController.show !== "function") return Promise.resolve();
   return AdController.show().catch(()=>{});
 }
-function endGame(){
-  showInterstitialAd().finally(()=> alert('Game over! Your score: ' + score));
-}
 
 /* ===== AdsGram: Reward setup (NEW) ===== */
 let RewardController = null;
@@ -172,16 +172,56 @@ if (window.Adsgram && typeof window.Adsgram.init === "function") {
 }
 function showRewardAd(){
   if (!RewardController || typeof RewardController.show !== "function") {
-    return Promise.resolve();
+    return Promise.resolve(false);
   }
   return RewardController.show()
     .then(res => {
       console.log("Reward ad result:", res);
-      alert("✅ Reward granted!");
+      return true; // اعتبرنا الإعلان اتشاف بنجاح
     })
     .catch(err => {
       console.warn("Reward ad error:", err);
+      return false;
     });
+}
+
+/* ✅ reviveBoard: نفك الزنقة عشان يقدر يكمل بعد الريوارد */
+function reviveBoard(){
+  const filled=[];
+  for(let r=0;r<size;r++) for(let c=0;c<size;c++){
+    if(grid[r][c]!==0) filled.push([r,c]);
+  }
+  if(filled.length){
+    const [rr,cc]=filled[Math.floor(Math.random()*filled.length)];
+    grid[rr][cc]=0;
+  }
+  addTile();
+  updateBest();
+}
+
+/* ✅ endGame: ربطنا السيناريو (Reward أولاً، ولو فشل/رفض → Interstitial) */
+function endGame(){
+  if (!continuedOnce && RewardController) {
+    const wantContinue = confirm("Game over! Your score: " + score + "\n\nWatch an ad to continue?");
+    if (wantContinue) {
+      showRewardAd().then(ok=>{
+        if (ok){
+          continuedOnce = true;
+          reviveBoard();
+          draw();
+        }else{
+          showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
+        }
+      });
+      return;
+    } else {
+      showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
+      return;
+    }
+  }
+
+  // لو استهلك الفرصة أو مفيش Reward جاهز
+  showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
 }
 
 /* ===== Start ===== */
