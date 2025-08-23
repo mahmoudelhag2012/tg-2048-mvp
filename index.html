@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ar">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -16,11 +16,11 @@
     .wrap{max-width:420px;margin:0 auto;text-align:center}
     h1{margin:0 0 8px}
     .top{display:flex;gap:8px;justify-content:center;margin-bottom:8px}
-    .card{background:#bbada0;color:#fff;border-radius:12px;padding:8px 12px;min-width:100px}
+    .card{background:#bbada0;color:#fff;border-radius:12px;padding:8px 12px;min-width:110px}
     .grid{background:#bbada0;border-radius:12px;padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;touch-action:none}
     .cell{height:80px;background:#cdc1b4;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px}
     .btns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
-    button{padding:10px;border:0;border-radius:10px;font-weight:700;background:#8f7a66;color:#fff}
+    button{padding:10px;border:0;border-radius:10px;font-weight:700;background:#8f7a66;color:#fff;cursor:pointer}
     small{opacity:.7}
   </style>
 </head>
@@ -31,20 +31,23 @@
     <div class="card">Score<br><b id="score">0</b></div>
     <div class="card">Best<br><b id="best">0</b></div>
   </div>
+
   <div class="grid" id="grid"></div>
+
   <div class="btns">
     <span></span><button id="up">▲</button><span></span>
     <button id="left">◀</button><button id="down">▼</button><button id="right">▶</button>
-    <button id="new">لعبة جديدة</button><button id="share">مشاركة</button><button id="about">عن اللعبة</button>
+    <button id="new">New Game</button><button id="share">Share</button><button id="about">About</button>
   </div>
-  <p><small>اسحب على اللوحة أو استخدم الأزرار. نسخة MVP.</small></p>
+
+  <p><small>Swipe on the board or use the arrows. MVP build.</small></p>
 </div>
 
 <script>
 /* ===== Telegram ===== */
-const tg = window.Telegram?.WebApp; if (tg) tg.expand();
+const tg = window.Telegram?.WebApp; if (tg) { tg.expand(); }
 
-/* ===== Game State ===== */
+/* ===== Game state ===== */
 const size=4; let grid=[], score=0, best=+localStorage.getItem('best2048')||0;
 const gridEl=document.getElementById('grid'); const scoreEl=document.getElementById('score'); const bestEl=document.getElementById('best');
 
@@ -83,39 +86,14 @@ function rotate(times){
   }
 }
 
-/* ===== الاتجاهات المصححة =====
-   dir: 0 left, 1 up, 2 right, 3 down
-   فوق = rotate(3) قبل السحب، ثم rotate(1) للرجوع
-   تحت = rotate(1) قبل السحب، ثم rotate(3) للرجوع
-*/
+/* dir: 0=left, 1=up, 2=right, 3=down */
 function move(dir){
-  const before = JSON.stringify(grid);
-
-  if (dir === 2) {         // right
-    rotate(2);
-  } else if (dir === 1) {  // up
-    rotate(3);
-  } else if (dir === 3) {  // down
-    rotate(1);
-  }
-
-  for (let r = 0; r < size; r++) grid[r] = slide(grid[r]);
-
-  if (dir === 2) {
-    rotate(2);
-  } else if (dir === 1) {
-    rotate(1);
-  } else if (dir === 3) {
-    rotate(3);
-  }
-
-  const after = JSON.stringify(grid);
-  if (before !== after) {
-    addTile();
-    updateBest();
-    draw();
-    if (gameOver()) endGame();
-  }
+  const before=JSON.stringify(grid);
+  if(dir===2){rotate(2);} else if(dir===1){rotate(1);} else if(dir===3){rotate(3);} // make movement be "left"
+  for(let r=0;r<size;r++){ grid[r]=slide(grid[r]); }
+  if(dir===2){rotate(2);} else if(dir===1){rotate(3);} else if(dir===3){rotate(1);} // rotate back
+  const after=JSON.stringify(grid);
+  if(before!==after){ addTile(); updateBest(); draw(); if(gameOver()) endGame(); }
 }
 
 function gameOver(){
@@ -129,43 +107,55 @@ function gameOver(){
 }
 function updateBest(){ if(score>best){ best=score; localStorage.setItem('best2048', best); }}
 
-/* ===== Inputs ===== */
-const startPos={x:0,y:0}; let dragging=false;
-function touchStart(e){dragging=true; const t=e.touches?e.touches[0]:e; startPos.x=t.clientX; startPos.y=t.clientY;}
+/* ===== Input (swipe/buttons) ===== */
+const startPos={x:0,y:0}; let dragging=false; const TH=18;
+
+function touchStart(e){
+  dragging=true; const t=e.touches?e.touches[0]:e;
+  startPos.x=t.clientX; startPos.y=t.clientY;
+}
 function touchEnd(e){
   if(!dragging) return; dragging=false;
   const t=e.changedTouches?e.changedTouches[0]:e;
   const dx=t.clientX-startPos.x, dy=t.clientY-startPos.y;
-  if(Math.abs(dx)>Math.abs(dy)){ move(dx>0?2:0); } else { move(dy>0?3:1); }
+  if(Math.abs(dx) < TH && Math.abs(dy) < TH) return;
+  if(Math.abs(dx)>Math.abs(dy)){
+    move(dx>0?2:0);
+  }else{
+    move(dy>0?3:1);
+  }
 }
+
 document.getElementById('left').onclick=()=>move(0);
 document.getElementById('up').onclick=()=>move(1);
 document.getElementById('right').onclick=()=>move(2);
 document.getElementById('down').onclick=()=>move(3);
 document.getElementById('new').onclick=()=>setup();
-document.getElementById('about').onclick=()=>alert('2048 Mini — MVP.');
+document.getElementById('about').onclick=()=>alert('2048 Mini — MVP build.');
 document.getElementById('share').onclick=()=>{
-  const text=`جبت اسكور ${score} في 2048 Mini!`;
+  const text=`I scored ${score} in 2048 Mini!`;
   if(navigator.share){navigator.share({text});}
-  else {prompt('انسخ وشارك نتيجتك:', text);}
+  else {prompt('Copy and share your score:', text);}
 };
 gridEl.addEventListener('touchstart',touchStart); gridEl.addEventListener('touchend',touchEnd);
 gridEl.addEventListener('mousedown',touchStart); gridEl.addEventListener('mouseup',touchEnd);
 
-/* ===== AdsGram: init + إعلان نهاية اللعبة ===== */
+/* ===== AdsGram (show at game over) ===== */
 let AdController = null;
-if (window.Adsgram && typeof window.Adsgram.init === "function") {
+if (window.Adsgram && typeof window.Adsgram.init === 'function') {
   AdController = window.Adsgram.init({ blockId: "int-14155" });
 }
 function showInterstitialAd(){
-  if (!AdController || typeof AdController.show !== "function") return Promise.resolve();
+  if (!AdController || typeof AdController.show !== 'function') return Promise.resolve();
   return AdController.show().catch(()=>{});
 }
 function endGame(){
-  showInterstitialAd().finally(()=> alert('انتهت اللعبة! نتيجتك: ' + score));
+  showInterstitialAd().finally(()=>{
+    alert('Game over! Your score: ' + score);
+  });
 }
 
-/* ===== Start ===== */
+/* Start */
 setup();
 </script>
 </body>
