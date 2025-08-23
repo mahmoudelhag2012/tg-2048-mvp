@@ -81,42 +81,41 @@ function slide(row){
 function rotate(times){
   for(let t=0;t<times;t++){
     const g=Array.from({length:size},()=>Array(size).fill(0));
-    for(let r=0;r<size;r++)for(let c=0;c<size;c++) g[c][size-1-r]=grid[r][c]; // 90° CW
+    // 90° clockwise
+    for(let r=0;r<size;r++)for(let c=0;c<size;c++) g[c][size-1-r]=grid[r][c];
     grid=g;
   }
 }
 
 /* dir: 0=left, 1=up, 2=right, 3=down
-   ✅ mapping that was working for you:
-   up  -> rotate(1) before, rotate(3) after
-   right -> rotate(2) before & after
-   down -> rotate(3) before, rotate(1) after
-   left -> no rotation
+   FINAL mapping:
+   - left:  no rotation
+   - up:    rotate(3) then slide-left, then rotate(1)
+   - right: rotate(2) then slide-left, then rotate(2)
+   - down:  rotate(1) then slide-left, then rotate(3)
 */
 function move(dir){
   const before=JSON.stringify(grid);
 
-  if(dir===0){
-    // left: no rotation
-  } else if(dir===1){
-    rotate(1);            // up (CW)
-  } else if(dir===2){
-    rotate(2);            // right (180)
-  } else if(dir===3){
-    rotate(3);            // down (CCW)
+  if (dir===1){         // up
+    rotate(3);          // CCW
+  } else if (dir===2){  // right
+    rotate(2);
+  } else if (dir===3){  // down
+    rotate(1);          // CW
   }
+  // left (0): no rotation
 
   for(let r=0;r<size;r++){ grid[r]=slide(grid[r]); }
 
-  if(dir===0){
-    // left: no rotation back
-  } else if(dir===1){
-    rotate(3);            // undo up
-  } else if(dir===2){
-    rotate(2);            // undo right
-  } else if(dir===3){
-    rotate(1);            // undo down
+  if (dir===1){
+    rotate(1);          // undo up
+  } else if (dir===2){
+    rotate(2);          // undo right
+  } else if (dir===3){
+    rotate(3);          // undo down
   }
+  // left: no undo
 
   const after=JSON.stringify(grid);
   if(before!==after){ addTile(); updateBest(); draw(); if(gameOver()) endGame(); }
