@@ -165,6 +165,25 @@ function endGame(){
   showInterstitialAd().finally(()=> alert('Game over! Your score: ' + score));
 }
 
+/* ===== AdsGram: Reward setup (NEW) ===== */
+let RewardController = null;
+if (window.Adsgram && typeof window.Adsgram.init === "function") {
+  RewardController = window.Adsgram.init({ blockId: "14159" }); // Reward Block ID
+}
+function showRewardAd(){
+  if (!RewardController || typeof RewardController.show !== "function") {
+    return Promise.resolve();
+  }
+  return RewardController.show()
+    .then(res => {
+      console.log("Reward ad result:", res);
+      alert("✅ Reward granted!");
+    })
+    .catch(err => {
+      console.warn("Reward ad error:", err);
+    });
+}
+
 /* ===== Start ===== */
 setup();
 </script>
