@@ -20,6 +20,24 @@
         token: 'a14e3947-839f-4b2a-aee0-5a3b1412c818'
       });
     }
+
+    // UIDs الخاصة ببلوكات Telega
+    const TELEG_UID_1024 = "3a1f1a7a-028c-4909-b20b-f4733d02fcc5";
+    const TELEG_UID_2048 = "3a1f1a7a-028c-4909-b20b-f4733d02fcc5"; // بدّله ببلوك 2048 لو عملته
+
+    // دالة مساعدة: تحاول تستخدم طريقة Telega المناسبة المتاحة
+    function showTelega(uid) {
+      try {
+        if (window.ads && typeof window.ads.ad_show === "function") {
+          return window.ads.ad_show({ adBlockUid: uid });
+        } else if (telegaAds && typeof telegaAds.show === "function") {
+          return telegaAds.show();
+        }
+      } catch(e) {
+        console.warn("Telega show error:", e);
+      }
+      return Promise.resolve();
+    }
   </script>
 
   <style>
@@ -81,13 +99,13 @@ function draw(){
     gridEl.appendChild(d);
 
     /* 🎯 milestone: أول مرة تظهر 1024/2048 اعرض إعلان Telega.io */
-    if (v === 1024 && !shown1024Ad && telegaAds) {
+    if (v === 1024 && !shown1024Ad) {
       shown1024Ad = true;
-      telegaAds.show().catch(()=>{});
+      showTelega(TELEG_UID_1024);
     }
-    if (v === 2048 && !shown2048Ad && telegaAds) {
+    if (v === 2048 && !shown2048Ad) {
       shown2048Ad = true;
-      telegaAds.show().catch(()=>{});
+      showTelega(TELEG_UID_2048);
     }
   }
 }
