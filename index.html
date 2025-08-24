@@ -13,32 +13,68 @@
 
   <!-- Telega.io SDK -->
   <script src="https://inapp.telega.io/sdk/v1/sdk.js"></script>
+
   <script>
-    // Telega init
-    var telegaAds = null;
-    if (window.TelegaIn && window.TelegaIn.AdsController) {
-      telegaAds = window.TelegaIn.AdsController.create_miniapp({
-        token: 'a14e3947-839f-4b2a-aee0-5a3b1412c818'
-      });
+    // ========= Telega init & ready helper =========
+    let telegaReadyResolve;
+    const telegaReady = new Promise(res => (telegaReadyResolve = res));
+
+    // Telega miniapp controller (fallback API)
+    let telegaAds = null;
+
+    function markTelegaReady() {
+      try {
+        if (window.TelegaIn && window.TelegaIn.AdsController && !telegaAds) {
+          telegaAds = window.TelegaIn.AdsController.create_miniapp({
+            token: 'a14e3947-839f-4b2a-aee0-5a3b1412c818'
+          });
+        }
+      } catch(e) {}
+      telegaReadyResolve && telegaReadyResolve();
     }
 
-    // Your Telega AdBlock UUIDs
+    // SDKs قد تتأخر.. نعتبر جاهز لما window.ads أو telegaAds يتوفروا
+    (function waitTelegaSDK(attempts=0){
+      if ((window.ads && typeof window.ads.ad_show === "function") || (window.TelegaIn && window.TelegaIn.AdsController)) {
+        markTelegaReady();
+      } else if (attempts < 40) { // ~2s
+        setTimeout(()=>waitTelegaSDK(attempts+1), 50);
+      } else {
+        // نكمّل من غير ما نكسر اللعبة
+        telegaReadyResolve && telegaReadyResolve();
+      }
+    })();
+
+    // UIDs الخاصة ببلوكات Telega
     const TELEG_UID_1024 = "3a1f1a7a-028c-4909-b20b-f4733d02fcc5";
     const TELEG_UID_2048 = "6a5cb9ac-15d0-4da2-bbca-916236f1bc83";
 
-    // Helper: try both Telega show methods
+    // دالة مساعدة: تحاول تستخدم طريقة Telega المناسبة المتاحة
     function showTelega(uid) {
-      try {
-        if (window.ads && typeof window.ads.ad_show === "function") {
-          return window.ads.ad_show({ adBlockUuid: uid });
-        } else if (telegaAds && typeof telegaAds.show === "function") {
-          return telegaAds.show();
+      return telegaReady.then(() => {
+        try {
+          if (window.ads && typeof window.ads.ad_show === "function") {
+            // الاسم الصحيح للخاصية: adBlockUuid (مش adBlockUid)
+            return window.ads.ad_show({ adBlockUuid: uid });
+          } else if (telegaAds && typeof telegaAds.show === "function") {
+            return telegaAds.show();
+          }
+        } catch(e) {
+          console.warn("Telega show error:", e);
         }
-      } catch (e) {
-        console.warn("Telega show error:", e);
-      }
-      // Always resolve to not block game flow
-      return Promise.resolve();
+        return Promise.resolve(); // ما نعطّلش اللعبة لو الإعلان مش جاهز
+      });
+    }
+
+    // قراءة start param (للّدعوات)
+    function getStartParam() {
+      try {
+        const tg = window.Telegram?.WebApp;
+        const p1 = tg?.initDataUnsafe?.start_param;
+        if (p1) return p1;
+      } catch(e){}
+      const u = new URL(location.href);
+      return u.searchParams.get('startapp') || u.searchParams.get('ref') || '';
     }
   </script>
 
@@ -53,6 +89,8 @@
     .btns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
     button{padding:10px;border:0;border-radius:10px;font-weight:700;background:#8f7a66;color:#fff;cursor:pointer}
     small{opacity:.7}
+    .toolbar{display:flex;gap:8px;justify-content:center;margin:10px 0 0}
+    .toolbar button{background:#6b5b4a}
   </style>
 </head>
 <body>
@@ -63,12 +101,19 @@
     <div class="card">Best<br><b id="best">0</b></div>
     <div class="card">Lives<br><b id="lives">0</b></div>
   </div>
+
   <div class="grid" id="grid"></div>
+
   <div class="btns">
     <span></span><button id="up">▲</button><span></span>
     <button id="left">◀</button><button id="down">▼</button><button id="right">▶</button>
     <button id="new">New Game</button><button id="share">Share</button><button id="about">About</button>
   </div>
+
+  <div class="toolbar">
+    <button id="invite">Invite Friend</button>
+  </div>
+
   <p><small>Swipe on the board or use the arrows. MVP build.</small></p>
 </div>
 
@@ -81,16 +126,11 @@ const size=4; let grid=[], score=0, best=+localStorage.getItem('best2048')||0;
 const gridEl=document.getElementById('grid'); const scoreEl=document.getElementById('score'); const bestEl=document.getElementById('best');
 const livesEl=document.getElementById('lives');
 
-// Extra lives from rewards/invites
 let extraLives = +localStorage.getItem('extraLives') || 0;
-
-// One continue per run via AdsGram reward
-let continuedOnce = false;
-
-// Telega milestone flags
-let shown512Offer = false;   // prompt for extra life (optional)
-let shown1024Ad  = false;    // auto show ad
-let shown2048Ad  = false;    // auto show ad
+let continuedOnce = false;          // AdsGram reward continue once/run
+let shown512Offer = false;          // optional extra life at 512 (Telega)
+let shown1024Ad  = false;           // auto Telega at 1024
+let shown2048Ad  = false;           // auto Telega at 2048
 
 function saveLives(){ localStorage.setItem('extraLives', String(extraLives)); livesEl.textContent = String(extraLives); }
 function emptyGrid(){grid=Array.from({length:size},()=>Array(size).fill(0));}
@@ -107,9 +147,9 @@ function draw(){
     d.style.color=v>=8?'#f9f6f2':'#776e65';
     gridEl.appendChild(d);
 
-    // 🎯 512 milestone: optional Extra Life (Telega, once per run)
+    // 512: optional extra life (Telega)
     if (v === 512 && !shown512Offer) {
-      shown512Offer = true; // set before async to avoid multiple prompts
+      shown512Offer = true;
       setTimeout(()=>{
         const ok = confirm("Milestone 512! Watch an ad to get 1 Extra Life?");
         if (ok){
@@ -122,17 +162,16 @@ function draw(){
       }, 0);
     }
 
-    // 🎯 1024 milestone: auto Telega ad (once per run)
+    // 1024: auto Telega + small bonus
     if (v === 1024 && !shown1024Ad) {
       shown1024Ad = true;
       showTelega(TELEG_UID_1024).then(()=>{
-        // Optional: small bonus
         score += 100;
         draw();
       });
     }
 
-    // 🎯 2048 milestone: auto Telega ad (once per run)
+    // 2048: auto Telega
     if (v === 2048 && !shown2048Ad) {
       shown2048Ad = true;
       showTelega(TELEG_UID_2048).catch(()=>{});
@@ -222,6 +261,7 @@ document.getElementById('share').onclick=()=>{
   if(navigator.share){navigator.share({text});}
   else {prompt('Copy and share your score:', text);}
 };
+document.getElementById('invite').onclick=inviteFriend;
 gridEl.addEventListener('touchstart',touchStart); gridEl.addEventListener('touchend',touchEnd);
 gridEl.addEventListener('mousedown',touchStart); gridEl.addEventListener('mouseup',touchEnd);
 
@@ -246,7 +286,6 @@ function showRewardAd(){
 
 /* ===== Revive helpers ===== */
 function reviveBoard(){
-  // free exactly one filled cell (no addTile)
   const filled=[];
   for(let r=0;r<size;r++) for(let c=0;c<size;c++){
     if(grid[r][c]!==0) filled.push([r,c]);
@@ -260,7 +299,6 @@ function reviveBoard(){
 
 /* ===== Game Over Flow ===== */
 function endGame(){
-  // 1) Offer to use Extra Life first (no ad)
   if (extraLives > 0){
     const useLife = confirm("Game over! You have an Extra Life. Use it to continue?");
     if (useLife){
@@ -269,8 +307,6 @@ function endGame(){
       return;
     }
   }
-
-  // 2) Offer reward ad continue once
   if (!continuedOnce && RewardController) {
     const wantContinue = confirm("Game over! Watch an ad to continue?");
     if (wantContinue) {
@@ -286,8 +322,6 @@ function endGame(){
       return;
     }
   }
-
-  // 3) Fall back to interstitial
   showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
 }
 
@@ -301,13 +335,45 @@ function checkDailyReward() {
       score += 200;
       localStorage.setItem("dailyRewardDate", today);
       draw();
-    }).catch(()=>{ /* still mark as claimed? keep strict */ });
+    }).catch(()=>{ /* لو الإعلان فشل، مش هنضيف البونص */ });
+  }
+}
+
+/* ===== Invite Friend (share link) ===== */
+// ملحوظة: مكافأة الداعي نفسه تحتاج باك-إند. مؤقتًا بندي Extra Life للمدعو.
+function inviteFriend(){
+  const uid = tg?.initDataUnsafe?.user?.id || Math.floor(Math.random()*1e9);
+  const link = `https://t.me/Smart2048_bot/myapp?startapp=ref-${uid}`;
+  const msg = `Invite a friend to play 2048 Mini!\n\nInvite link:\n${link}`;
+
+  if (tg && typeof tg.openTelegramLink === 'function') {
+    tg.openTelegramLink(link);
+  } else if (navigator.share) {
+    navigator.share({ text: msg }).catch(()=>{ prompt('Copy invite link:', link); });
+  } else {
+    prompt('Copy invite link:', link);
+  }
+}
+
+/* ===== Claim invite reward for invitee (no backend) ===== */
+function checkInviteRewardForInvitee(){
+  const sp = getStartParam(); // e.g., "ref-12345"
+  if (sp && sp.startsWith('ref-') && !localStorage.getItem('claimedInviteOnce')){
+    const ok = confirm("You were invited! Watch an ad to claim 1 Extra Life?");
+    if (ok){
+      showTelega(TELEG_UID_1024).then(()=>{
+        extraLives += 1; saveLives();
+        localStorage.setItem('claimedInviteOnce','1');
+        alert("✅ Extra Life added!");
+      });
+    }
   }
 }
 
 /* ===== Start ===== */
 setup();
 checkDailyReward();
+checkInviteRewardForInvitee();
 </script>
 </body>
 </html>
