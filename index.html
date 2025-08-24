@@ -23,13 +23,14 @@
 
     // UIDs الخاصة ببلوكات Telega
     const TELEG_UID_1024 = "3a1f1a7a-028c-4909-b20b-f4733d02fcc5";
-    const TELEG_UID_2048 = "3a1f1a7a-028c-4909-b20b-f4733d02fcc5"; // بدّله ببلوك 2048 لو عملته
+    const TELEG_UID_2048 = "6a5cb9ac-15d0-4da2-bbca-916236f1bc83"; // ← بلوك 2048
 
     // دالة مساعدة: تحاول تستخدم طريقة Telega المناسبة المتاحة
     function showTelega(uid) {
       try {
         if (window.ads && typeof window.ads.ad_show === "function") {
-          return window.ads.ad_show({ adBlockUid: uid });
+          // ملاحظة: الخاصية الصحيحة Uuid
+          return window.ads.ad_show({ adBlockUuid: uid });
         } else if (telegaAds && typeof telegaAds.show === "function") {
           return telegaAds.show();
         }
