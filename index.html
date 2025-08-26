@@ -1,15 +1,284 @@
-<!-- جوه index.html -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>2048 Mini — MVP</title>
+
+  <!-- Telegram Mini App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- AdsGram SDK -->
+  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+  <!-- Telega.io SDK -->
+  <script src="https://inapp.telega.io/sdk/v1/sdk.js"></script>
+
+  <style>
+    :root{ --bg:#faf8ef; --board:#bbada0; --tile:#cdc1b4; --text:#776e65; --btn:#8f7a66; --white:#fff; }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,Arial;padding:16px;margin:0;background:var(--bg);color:var(--text);}
+    .wrap{max-width:480px;margin:0 auto;position:relative}
+    h1{margin:0 0 8px;font-size:32px;line-height:1.1;padding-right:50px}
+    .top{display:flex;gap:8px;justify-content:center;margin-bottom:8px}
+    .card{background:var(--board);color:var(--white);border-radius:12px;padding:8px 12px;min-width:100px;text-align:center}
+    .grid{background:var(--board);border-radius:12px;padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;touch-action:none}
+    .cell{height:80px;background:var(--tile);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px}
+    button{padding:10px 12px;border:0;border-radius:12px;font-weight:700;background:var(--btn);color:var(--white);cursor:pointer}
+    .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;justify-items:center;align-items:center}
+    .controls .spacer{height:0}
+    .arrow{min-width:96px;min-height:66px;font-size:20px}
+    .menuBtn{position:absolute;top:8px;right:8px;width:32px;height:32px;padding:0;min-width:0;min-height:0;line-height:1;background:transparent;color:var(--btn);border:2px solid var(--btn);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;z-index:11}
+    .backdrop{position:fixed;inset:0;background:#0007;display:none}
+    .backdrop.show{display:block}
+    .drawer{position:fixed;top:0;right:0;height:100dvh;width:220px;background:#f5efe6;box-shadow:0 0 30px #0003;padding:16px 14px;transform:translateX(100%);transition:transform .25s ease;z-index:12}
+    .drawer.open{transform:translateX(0)}
+    .drawer h3{margin:4px 0 12px}
+    .menuItem{display:block;width:100%;margin:8px 0;padding:12px 14px;background:var(--btn);color:#fff;border:0;border-radius:12px;font-weight:700;cursor:pointer}
+    .menuInfo{margin:6px 0 10px;font-weight:700;color:#333}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    small{opacity:.7}
+
+    /* Splash */
+    .splash{
+      position:fixed;inset:0;z-index:1000;
+      background:radial-gradient(120% 120% at 50% -20%,#fdf7ea 0%,#efe6d9 45%,#e7dccf 100%);
+      display:none; /* 🔒 مقفولة افتراضيًا كـ Hotfix */
+      align-items:center;justify-content:center;
+      transition:opacity .35s ease,visibility .35s ease;
+    }
+    .splash.show{display:flex}
+    .splash.hide{opacity:0;visibility:hidden}
+    .splash-card{width:min(88vw,420px);background:#ffffffcc;border:1px solid #e9dfd3;border-radius:18px;box-shadow:0 10px 30px #00000014;padding:18px 18px 14px;text-align:center;backdrop-filter:blur(4px)}
+    .splash-logo{width:100%;height:auto;border-radius:12px;display:block}
+    .splash-title{margin:10px 0 6px;font-weight:800;letter-spacing:.4px;color:#5a4a3d}
+    .splash-sub{margin:0 0 8px;color:#7b6d61;font-weight:600;font-size:14px}
+    .bar{height:8px;width:100%;background:#eadfce;border-radius:999px;overflow:hidden}
+    .bar>span{display:block;height:100%;width:0%;background:linear-gradient(90deg,#8f7a66,#b59d84);border-radius:999px;animation:fill 2.2s ease forwards}
+    @keyframes fill{to{width:100%}}
+    .tap-hint{margin-top:8px;font-size:12px;color:#998a7f}
+  </style>
+</head>
+<body>
+
+<!-- Splash (مقفول افتراضيًا؛ نفعّله فقط لو الصورة جاهزة) -->
+<div id="splash" class="splash">
+  <div class="splash-card" id="splashCard">
+    <img id="splashImg" class="splash-logo" alt="Earn USDT — 2048 Mini">
+    <h3 class="splash-title">Earn USDT while you play</h3>
+    <p class="splash-sub">Watch ads at milestones and collect rewards</p>
+    <div class="bar"><span></span></div>
+    <div class="tap-hint">Tap to continue</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <h1>2048 Mini</h1>
+  <button id="menuBtn" class="menuBtn" aria-label="Menu">☰</button>
+
+  <div class="top">
+    <div class="card">Score<br><b id="score">0</b></div>
+    <div class="card">Best<br><b id="best">0</b></div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="controls">
+    <span class="spacer"></span>
+    <button id="up" class="arrow">▲</button>
+    <span class="spacer"></span>
+    <button id="left" class="arrow">◀</button>
+    <button id="down" class="arrow">▼</button>
+    <button id="right" class="arrow">▶</button>
+  </div>
+
+  <p><small>Swipe on the board or use the arrows. MVP build.</small></p>
+</div>
+
+<div id="backdrop" class="backdrop"></div>
+<div id="drawer" class="drawer">
+  <h3>Menu</h3>
+  <div class="menuInfo">Balance (USDT): <span id="balance" class="mono">0.0000</span></div>
+  <button id="mNew" class="menuItem">New Game</button>
+  <button id="mInvite" class="menuItem">Invite Friend</button>
+  <button id="mShare" class="menuItem">Share</button>
+  <button id="mAbout" class="menuItem">About</button>
+</div>
 
 <script>
-const tg = window.Telegram?.WebApp; if (tg) tg.expand();
+/* ===== حارس أخطاء عام ما يوقفش الصفحة ===== */
+window.addEventListener('error', e => { try{ console.warn(e.message); }catch(_){} });
 
-/* === Splash image path (لينك مباشر من GitHub) === */
+/* ===== Telegram ===== */
+try{ const tg = window.Telegram?.WebApp; if (tg) tg.expand(); }catch(_){}
+
+/* ===== Telega helpers (محاطة بـ try) ===== */
+let telegaAds=null;
+try{
+  if (window.TelegaIn && window.TelegaIn.AdsController) {
+    telegaAds = window.TelegaIn.AdsController.create_miniapp({
+      token: 'a14e3947-839f-4b2a-aee0-5a3b1412c818'
+    });
+  }
+}catch(_){}
+const TELEG_UID_1024="3a1f1a7a-028c-4909-b20b-f4733d02fcc5";
+const TELEG_UID_2048="6a5cb9ac-15d0-4da2-bbca-916236f1bc83";
+function showTelega(uid){
+  try{
+    if (window.ads && typeof window.ads.ad_show==="function") return window.ads.ad_show({adBlockUuid:uid});
+    if (telegaAds && typeof telegaAds.show==="function") return telegaAds.show();
+  }catch(e){console.warn("Telega show error:",e)}
+  return Promise.resolve();
+}
+
+/* ===== Splash ===== */
 const SPLASH_IMG_URL = "https://raw.githubusercontent.com/mahmoudelhag2012/tg-2048-mvp/main/splash-usdt-2048.png";
-
 const splash = document.getElementById('splash');
 const splashImg = document.getElementById('splashImg');
-function hideSplash(){ splash.classList.add('hide'); setTimeout(()=> splash.style.display='none', 400); }
-splashImg.src = SPLASH_IMG_URL;
-splash.addEventListener('click', hideSplash);
-window.addEventListener('load', () => setTimeout(hideSplash, 2200));
+
+function hideSplash(){
+  splash.classList.add('hide');
+  setTimeout(()=> splash.style.display='none', 400);
+}
+function showSplash(){
+  splash.classList.remove('hide');
+  splash.classList.add('show');
+}
+try{
+  splashImg.src = SPLASH_IMG_URL;
+  splashImg.onload = ()=>{ showSplash(); setTimeout(hideSplash, 2200); };
+  splashImg.onerror = ()=>{ /* لو الصورة فشلت، كمّل اللعب عادي */ hideSplash(); };
+  splash.addEventListener('click', hideSplash);
+}catch(_){ hideSplash(); }
+
+/* ===== Game State ===== */
+const size=4; let grid=[], score=0, best=+localStorage.getItem('best2048')||0;
+const gridEl=document.getElementById('grid'); const scoreEl=document.getElementById('score'); const bestEl=document.getElementById('best');
+
+/* ===== Balance / Rewards ===== */
+const balanceEl = document.getElementById('balance');
+function getBalance(){ return +(localStorage.getItem('usdBalance')||'0'); }
+function setBalance(v){ const fixed=Math.max(0,v); localStorage.setItem('usdBalance',fixed.toFixed(4)); updateBalanceUI(); }
+function updateBalanceUI(){ balanceEl.textContent=(+localStorage.getItem('usdBalance')||0).toFixed(4); }
+updateBalanceUI();
+
+/* Rewards */
+let extraLives=0;
+const baseRewards={256:0.0002,512:0.0003,1024:0.0015,2048:0.002};
+let msRunCount={256:0,512:0,1024:0,2048:0};
+let msSeenTilesInRun={256:0,512:0,1024:0,2048:0};
+let reached2048InRun=false;
+
+/* AdsGram */
+let AdController=null, RewardController=null;
+try{
+  if(window.Adsgram&&typeof window.Adsgram.init==="function"){
+    AdController=window.Adsgram.init({blockId:"int-14155"});
+    RewardController=window.Adsgram.init({blockId:"14159"});
+  }
+}catch(_){}
+function showInterstitialAd(){ try{ if(!AdController||typeof AdController.show!=="function")return Promise.resolve(); return AdController.show().catch(()=>{});}catch(_){return Promise.resolve();} }
+function showRewardAd(){ try{ if(!RewardController||typeof RewardController.show!=="function")return Promise.resolve(false); return RewardController.show().then(()=>true).catch(()=>false);}catch(_){return Promise.resolve(false);} }
+
+function offerAndMaybeAward(ms,tier){
+  const base=baseRewards[ms]; if(!base) return;
+  const amount=tier==='full'?base:base/2;
+  const want=confirm(`Milestone ${ms} reached!\n${tier==='full'?'Claim ':'Claim (half) '}$${amount.toFixed(4)} by watching an ad?\nOK = Watch & claim,  Cancel = Skip`);
+  if(!want) return;
+  showRewardAd().then(ok=>{
+    if(!ok) return;
+    setBalance(getBalance()+amount);
+    if(ms===512||ms===2048) extraLives+=1;
+    alert(`✅ Reward added: $${amount.toFixed(4)}${(ms===512||ms===2048)?' + Extra Life':''}`);
+  });
+}
+
+let continuedOnce=false, shown1024Ad=false, shown2048Ad=false;
+
+/* Core game */
+function emptyGrid(){grid=Array.from({length:size},()=>Array(size).fill(0));}
+function randomEmpty(){const e=[]; for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(!grid[r][c])e.push([r,c]); return e.length?e[Math.floor(Math.random()*e.length)]:null;}
+function addTile(){const pos=randomEmpty(); if(!pos) return false; grid[pos[0]][pos[1]] = Math.random()<0.9?2:4; return true;}
+function setup(){ emptyGrid(); addTile(); addTile(); score=0; continuedOnce=false; shown1024Ad=false; shown2048Ad=false; msRunCount={256:0,512:0,1024:0,2048:0}; msSeenTilesInRun={256:0,512:0,1024:0,2048:0}; reached2048InRun=false; draw(); }
+
+function draw(){
+  gridEl.innerHTML=''; scoreEl.textContent=score; bestEl.textContent=best;
+  const currentCounts={256:0,512:0,1024:0,2048:0};
+  for(let r=0;r<size;r++)for(let c=0;c<size;c++){
+    const v=grid[r][c];
+    const d=document.createElement('div'); d.className='cell'; d.textContent=v||''; d.style.background=v?tileColor(v):'#cdc1b4'; d.style.color=v>=8?'#f9f6f2':'#776e65'; gridEl.appendChild(d);
+    if(v===256||v===512||v===1024||v===2048) currentCounts[v]++;
+    if(v===1024&&!shown1024Ad){shown1024Ad=true;showTelega(TELEG_UID_1024);}
+    if(v===2048&&!shown2048Ad){shown2048Ad=true;showTelega(TELEG_UID_2048);}
+  }
+  [256,512,1024,2048].forEach(ms=>{
+    const prev=msSeenTilesInRun[ms]||0, now=currentCounts[ms]||0, delta=Math.max(0,now-prev);
+    if(delta>0){
+      for(let i=0;i<delta;i++){
+        let tier='none';
+        if(msRunCount[ms]===0) tier='full';
+        else if(reached2048InRun) tier='half';
+        if(ms===2048&&msRunCount[2048]===0) reached2048InRun=true;
+        msRunCount[ms]++;
+        if(tier==='full') offerAndMaybeAward(ms,'full');
+        else if(tier==='half') offerAndMaybeAward(ms,'half');
+      }
+      msSeenTilesInRun[ms]=now;
+    } else msSeenTilesInRun[ms]=now;
+  });
+}
+function tileColor(v){const m={2:'#eee4da',4:'#ede0c8',8:'#f2b179',16:'#f59563',32:'#f67c5f',64:'#f65e3b',128:'#edcf72',256:'#edcc61',512:'#edc850',1024:'#edc53f',2048:'#edc22e'}; return m[v]||'#3c3a32';}
+function slide(row){const f=row.filter(x=>x); for(let i=0;i<f.length-1;i++){ if(f[i]===f[i+1]){ f[i]*=2; score+=f[i]; f.splice(i+1,1);} } while(f.length<size) f.push(0); return f;}
+function rotate(times){for(let t=0;t<times;t++){const g=Array.from({length:size},()=>Array(size).fill(0)); for(let r=0;r<size;r++)for(let c=0;c<size;c++) g[c][size-1-r]=grid[r][c]; grid=g;}}
+
+function move(dir){
+  const before=JSON.stringify(grid);
+  if(dir===2) rotate(2); else if(dir===1) rotate(3); else if(dir===3) rotate(1);
+  for(let r=0;r<size;r++) grid[r]=slide(grid[r]);
+  if(dir===2) rotate(2); else if(dir===1) rotate(1); else if(dir===3) rotate(3);
+  const after=JSON.stringify(grid);
+  if(before!==after){ addTile(); updateBest(); draw(); if(gameOver()) endGame(); }
+}
+function gameOver(){ if(randomEmpty()) return false; for(let r=0;r<size;r++)for(let c=0;c<size;c++){const v=grid[r][c]; if(r+1<size&&grid[r+1][c]===v) return false; if(c+1<size&&grid[r][c+1]===v) return false;} return true; }
+function updateBest(){ if(score>best){ best=score; localStorage.setItem('best2048',best);} }
+
+const startPos={x:0,y:0}; let dragging=false;
+function touchStart(e){dragging=true; const t=e.touches?e.touches[0]:e; startPos.x=t.clientX; startPos.y=t.clientY;}
+function touchEnd(e){ if(!dragging) return; dragging=false; const t=e.changedTouches?e.changedTouches[0]:e; const dx=t.clientX-startPos.x, dy=t.clientY-startPos.y; if(Math.abs(dx)>Math.abs(dy)){ move(dx>0?2:0);} else { move(dy>0?3:1);} }
+document.getElementById('grid').addEventListener('touchstart',touchStart);
+document.getElementById('grid').addEventListener('touchend',touchEnd);
+document.getElementById('grid').addEventListener('mousedown',touchStart);
+document.getElementById('grid').addEventListener('mouseup',touchEnd);
+
+document.getElementById('left').onclick=()=>move(0);
+document.getElementById('up').onclick=()=>move(1);
+document.getElementById('right').onclick=()=>move(2);
+document.getElementById('down').onclick=()=>move(3);
+
+const menuBtn=document.getElementById('menuBtn'); const drawer=document.getElementById('drawer'); const backdrop=document.getElementById('backdrop');
+function openDrawer(){ drawer.classList.add('open'); backdrop.classList.add('show'); }
+function closeDrawer(){ drawer.classList.remove('open'); backdrop.classList.remove('show'); }
+menuBtn.addEventListener('click', openDrawer); backdrop.addEventListener('click', closeDrawer);
+document.getElementById('mNew').onclick=()=>{ closeDrawer(); setup(); };
+document.getElementById('mInvite').onclick=()=>{ closeDrawer(); prompt('Copy link:','https://t.me/Smart2048_bot'); };
+document.getElementById('mShare').onclick=()=>{ closeDrawer(); const text=`I scored ${score} in 2048 Mini!`; if(navigator.share){navigator.share({text});} else {prompt('Copy and share your score:', text);} };
+document.getElementById('mAbout').onclick=()=>{ closeDrawer(); alert('2048 Mini — MVP.'); };
+
+function reviveBoard(){ const filled=[]; for(let r=0;r<size;r++) for(let c=0;c<size;c++){ if(grid[r][c]!==0) filled.push([r,c]); } if(filled.length){ const [rr,cc]=filled[Math.floor(Math.random()*filled.length)]; grid[rr][cc]=0; } updateBest(); }
+function endGame(){
+  if(!continuedOnce){
+    const wantContinue=confirm("Game over! Your score: "+score+"\n\nWatch an ad to continue?");
+    if(wantContinue){
+      showRewardAd().then(ok=>{ if(ok){ continuedOnce=true; reviveBoard(); draw(); } else { showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score)); } });
+      return;
+    } else {
+      showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
+      return;
+    }
+  }
+  showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
+}
+
+/* ابدأ اللعبة بعد ما الصفحة تجهز */
+window.addEventListener('load', setup);
 </script>
+</body>
+</html>
