@@ -101,6 +101,8 @@
   <button id="mInvite" class="menuItem">Invite Friend</button>
   <button id="mShare" class="menuItem">Share</button>
   <button id="mAbout" class="menuItem">About</button>
+  <!-- ✅ زر Claim الجديد (مخفي افتراضيًا) -->
+  <button id="mClaim" class="menuItem" style="display:none">Claim</button>
 </div>
 
 <script>
@@ -108,7 +110,7 @@
 window.addEventListener('error', e => { try{ console.warn(e.message); }catch(_){} });
 
 /* ===== Telegram ===== */
-try{ const tg = window.Telegram?.WebApp; if (tg) tg.expand(); }catch(_){}
+let tg=null; try{ tg = window.Telegram?.WebApp; if (tg) tg.expand(); }catch(_){}
 
 /* ===== Telega helpers (محاطة بـ try) ===== */
 let telegaAds=null;
@@ -145,7 +147,7 @@ function showSplash(){
 try{
   splashImg.src = SPLASH_IMG_URL;
   splashImg.onload = ()=>{ showSplash(); setTimeout(hideSplash, 2200); };
-  splashImg.onerror = ()=>{ /* لو الصورة فشلت، كمّل اللعب عادي */ hideSplash(); };
+  splashImg.onerror = ()=>{ hideSplash(); };
   splash.addEventListener('click', hideSplash);
 }catch(_){ hideSplash(); }
 
@@ -155,10 +157,56 @@ const gridEl=document.getElementById('grid'); const scoreEl=document.getElementB
 
 /* ===== Balance / Rewards ===== */
 const balanceEl = document.getElementById('balance');
+const claimBtn  = document.getElementById('mClaim');
 function getBalance(){ return +(localStorage.getItem('usdBalance')||'0'); }
 function setBalance(v){ const fixed=Math.max(0,v); localStorage.setItem('usdBalance',fixed.toFixed(4)); updateBalanceUI(); }
-function updateBalanceUI(){ balanceEl.textContent=(+localStorage.getItem('usdBalance')||0).toFixed(4); }
+function updateBalanceUI(){
+  const bal = (+localStorage.getItem('usdBalance')||0);
+  balanceEl.textContent = bal.toFixed(4);
+  // ✅ أظهر زر Claim لما الرصيد ≥ 1$
+  claimBtn.style.display = bal >= 1 ? 'block' : 'none';
+}
 updateBalanceUI();
+
+/* ===== Claim logic (إرسال الطلب للسيرفر) ===== */
+claimBtn.addEventListener('click', requestClaim);
+
+async function requestClaim(){
+  const amount = Math.floor(getBalance() * 100) / 100; // لحد سنتين
+  if (amount < 1) { alert('Min claim is $1.00'); return; }
+  const ok = confirm(`Request payout $${amount.toFixed(2)} ?`);
+  if (!ok) return;
+
+  try{
+    claimBtn.disabled = true;
+
+    const initData = tg?.initData || '';
+    const user = tg?.initDataUnsafe?.user || null;
+
+    const res = await fetch('https://YOUR_DOMAIN/claim', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        amount,
+        balance: getBalance(),
+        user,
+        initData
+      })
+    });
+
+    const data = await res.json().catch(()=> ({}));
+    if (!res.ok) throw new Error(data?.error || 'Claim failed');
+
+    alert('✅ Claim submitted. We will review and pay soon.');
+    // اختياري: تقليل الرصيد الآن أو لما الدفع يتم
+    // setBalance(getBalance() - amount);
+  }catch(err){
+    console.warn(err);
+    alert('❌ Could not submit claim. Try again later.');
+  }finally{
+    claimBtn.disabled = false;
+  }
+}
 
 /* Rewards */
 let extraLives=0;
