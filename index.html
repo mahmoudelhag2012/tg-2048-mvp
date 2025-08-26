@@ -11,122 +11,134 @@
   <!-- AdsGram SDK -->
   <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 
+  <!-- Telega.io SDK -->
+  <script src="https://inapp.telega.io/sdk/v1/sdk.js"></script>
+  <script>
+    var telegaAds = null;
+    if (window.TelegaIn && window.TelegaIn.AdsController) {
+      telegaAds = window.TelegaIn.AdsController.create_miniapp({
+        token: 'a14e3947-839f-4b2a-aee0-5a3b1412c818'
+      });
+    }
+
+    // UIDs الخاصة ببلوكات Telega
+    const TELEG_UID_1024 = "3a1f1a7a-028c-4909-b20b-f4733d02fcc5";
+    const TELEG_UID_2048 = "6a5cb9ac-15d0-4da2-bbca-916236f1bc83"; // ← بلوك 2048
+
+    // دالة مساعدة: تحاول تستخدم طريقة Telega المناسبة المتاحة
+    function showTelega(uid) {
+      try {
+        if (window.ads && typeof window.ads.ad_show === "function") {
+          return window.ads.ad_show({ adBlockUuid: uid });
+        } else if (telegaAds && typeof telegaAds.show === "function") {
+          return telegaAds.show();
+        }
+      } catch(e) {
+        console.warn("Telega show error:", e);
+      }
+      return Promise.resolve();
+    }
+  </script>
+
   <style>
     body{font-family:system-ui,Arial;padding:16px;margin:0;background:#faf8ef;color:#776e65;}
     .wrap{max-width:420px;margin:0 auto;text-align:center}
-    h1{margin:0 0 8px}
+
+    /* Header with menu */
+    .header{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px}
+    .header h1{margin:0}
+    .menu-btn{padding:8px 12px;border:0;border-radius:10px;background:#8f7a66;color:#fff;font-weight:700;cursor:pointer}
+
     .top{display:flex;gap:8px;justify-content:center;margin-bottom:8px}
     .card{background:#bbada0;color:#fff;border-radius:12px;padding:8px 12px;min-width:100px}
     .grid{background:#bbada0;border-radius:12px;padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;touch-action:none}
     .cell{height:80px;background:#cdc1b4;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px}
-    .btns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
-    button{padding:10px;border:0;border-radius:10px;font-weight:700;background:#8f7a66;color:#fff;cursor:pointer}
+
+    /* Bigger arrow buttons */
+    .btns{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+    .btns button{padding:16px 0;border:0;border-radius:12px;font-weight:800;background:#8f7a66;color:#fff;font-size:20px;cursor:pointer}
+
+    /* Drawer (side menu) */
+    .backdrop{position:fixed;inset:0;background:#0008;opacity:0;pointer-events:none;transition:.2s}
+    .backdrop.show{opacity:1;pointer-events:auto}
+    .drawer{position:fixed;top:0;right:-280px;height:100dvh;width:280px;background:#f5efe6;
+      box-shadow:0 0 30px #0003;padding:16px;transition:.25s}
+    .drawer.open{right:0}
+    .drawer h3{margin:0 0 12px;color:#8f7a66}
+    .drawer .menu-item{display:block;width:100%;text-align:left;margin:8px 0;padding:12px;border:0;border-radius:10px;
+      background:#8f7a66;color:#fff;font-weight:700;cursor:pointer}
+
+    /* Hide legacy action buttons container (we keep them for their handlers) */
+    .hidden-actions{display:none}
     small{opacity:.7}
-    .row{display:flex;gap:8px;justify-content:center;margin-top:8px}
   </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>2048 Mini</h1>
+
+  <!-- Header with Menu -->
+  <div class="header">
+    <h1>2048 Mini</h1>
+    <button id="menuBtn" class="menu-btn">Menu ☰</button>
+  </div>
+
   <div class="top">
     <div class="card">Score<br><b id="score">0</b></div>
     <div class="card">Best<br><b id="best">0</b></div>
   </div>
+
   <div class="grid" id="grid"></div>
+
+  <!-- Arrows only -->
   <div class="btns">
     <span></span><button id="up">▲</button><span></span>
     <button id="left">◀</button><button id="down">▼</button><button id="right">▶</button>
-    <button id="new">New Game</button><button id="share">Share</button><button id="about">About</button>
   </div>
-  <div class="row">
-    <button id="invite">Invite Friend</button>
+
+  <!-- (Removed helper text to give more space) -->
+  <!-- <p><small>Swipe on the board or use the arrows. MVP build.</small></p> -->
+
+  <!-- Hidden original action buttons (to keep same IDs/handlers) -->
+  <div class="hidden-actions">
+    <button id="new">New Game</button>
+    <button id="share">Share</button>
+    <button id="about">About</button>
+    <!-- لو عندك Invite لاحقًا خليه هنا بنفس الـ ID القديم -->
+    <!-- <button id="invite">Invite Friend</button> -->
   </div>
-  <p><small>Swipe on the board or use the arrows. MVP build.</small></p>
+</div>
+
+<!-- Drawer UI -->
+<div id="backdrop" class="backdrop"></div>
+<div id="drawer" class="drawer">
+  <h3>Menu</h3>
+  <button class="menu-item" id="m-new">New Game</button>
+  <button class="menu-item" id="m-share">Share</button>
+  <button class="menu-item" id="m-about">About</button>
+  <!-- لو ضفت زر Invite مستقبلاً:
+  <button class="menu-item" id="m-invite">Invite Friend</button>
+  -->
 </div>
 
 <script>
 /* ===== Telegram ===== */
 const tg = window.Telegram?.WebApp; if (tg) tg.expand();
-const tgUserId   = tg?.initDataUnsafe?.user?.id || null;
-const startParam = tg?.initDataUnsafe?.start_param || null;
 
 /* ===== Game State ===== */
 const size=4; let grid=[], score=0, best=+localStorage.getItem('best2048')||0;
 const gridEl=document.getElementById('grid'); const scoreEl=document.getElementById('score'); const bestEl=document.getElementById('best');
 
-/* Flags / Rewards */
-let continuedOnce   = false;
-let shown1024Ad     = false;
-let shown2048Ad     = false;
-let bonus1024Given  = false;
-let extraLives      = 0;
-let offered512      = false;
+/* ✅ فرصة متابعة واحدة لكل جولة */
+let continuedOnce = false;
 
-/* ===== Invite / Referral ===== */
-function buildInviteLink(){
-  const refCode = tgUserId ? `ref_${tgUserId}` : `ref_anon`;
-  return `https://t.me/Smart2048_bot/myapp?startapp=${encodeURIComponent(refCode)}`;
-}
-document.getElementById('invite').onclick = () => {
-  const link = buildInviteLink();
-  const msg = `Come play 2048 Mini!\nInvite link: ${link}`;
-  if (navigator.share) { navigator.share({ text: msg, url: link }).catch(()=>copyFallback()); }
-  else { copyFallback(); }
-  function copyFallback(){ prompt('Copy your invite link:', link); }
-};
+/* ✅ إعلانات milestone (Telega): 1024 + 2048 */
+let shown1024Ad = false;
+let shown2048Ad = false;
 
-function handleReferralOpen(){
-  if (!startParam || !startParam.startsWith('ref_')) return;
-  const inviterId = startParam.substring(4);
-  const onceKey = `ref_seen_from_${inviterId}`;
-  if (tgUserId && String(tgUserId) === String(inviterId)) return;
-  if (localStorage.getItem(onceKey)) return;
-
-  const want = confirm("You joined via a friend's invite.\nWatch an ad to grant them an Extra Life?\nYou'll also get +1 Extra Life.");
-  if (!want) { localStorage.setItem(onceKey, '1'); return; }
-
-  showRewardAd().then(ok=>{
-    localStorage.setItem(onceKey, '1');
-    if (ok){
-      extraLives += 1;
-      alert("✅ Extra Life added! (You now have " + extraLives + ")");
-    }
-  });
-}
-
-/* ===== Daily Reward (once/day) via AdsGram Reward ===== */
-function checkDailyReward(){
-  const today = new Date().toISOString().slice(0,10);
-  const last  = localStorage.getItem("lastDailyReward");
-  if (last === today) return;
-
-  const want = confirm("🎁 Daily Reward! Watch an ad to claim +200 points.");
-  localStorage.setItem("lastDailyReward", today);
-
-  if (want){
-    showRewardAd().then(ok=>{
-      if (ok){
-        score += 200;
-        updateBest();
-        draw();
-        alert("✅ +200 points added!");
-      }
-    });
-  }
-}
-
-/* ===== Core game ===== */
 function emptyGrid(){grid=Array.from({length:size},()=>Array(size).fill(0));}
 function randomEmpty(){const e=[]; for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(!grid[r][c])e.push([r,c]); return e.length?e[Math.floor(Math.random()*e.length)]:null;}
 function addTile(){const pos=randomEmpty(); if(!pos) return false; grid[pos[0]][pos[1]] = Math.random()<0.9?2:4; return true;}
-function setup(){
-  emptyGrid(); addTile(); addTile();
-  score=0; continuedOnce=false; shown1024Ad=false; shown2048Ad=false;
-  bonus1024Given=false; offered512=false;
-  draw();
-  handleReferralOpen();
-  checkDailyReward();
-}
+function setup(){emptyGrid(); addTile(); addTile(); score=0; continuedOnce=false; shown1024Ad=false; shown2048Ad=false; draw();}
 
 function draw(){
   gridEl.innerHTML=''; scoreEl.textContent=score; bestEl.textContent=best;
@@ -137,32 +149,14 @@ function draw(){
     d.style.color=v>=8?'#f9f6f2':'#776e65';
     gridEl.appendChild(d);
 
-    if (v === 512 && !offered512) {
-      offered512 = true;
-      const want = confirm("Nice! You reached 512.\nWatch an ad to get 1 Extra Life?");
-      if (want) {
-        showRewardAd().then(ok=>{
-          if (ok){
-            extraLives += 1;
-            alert("✅ Extra Life granted! (You now have " + extraLives + ")");
-          }
-        });
-      }
+    /* 🎯 milestone: أول مرة تظهر 1024/2048 اعرض إعلان Telega.io */
+    if (v === 1024 && !shown1024Ad) {
+      shown1024Ad = true;
+      showTelega(TELEG_UID_1024);
     }
-
-    if (v === 1024) {
-      if (!shown1024Ad) { shown1024Ad = true; showInterstitialAd(); }
-      if (!bonus1024Given) {
-        bonus1024Given = true;
-        score += 100;
-        alert("🎉 Milestone reached: 1024!\nBonus +100 points added.");
-        scoreEl.textContent = score;
-      }
-    }
-
     if (v === 2048 && !shown2048Ad) {
       shown2048Ad = true;
-      showInterstitialAd();
+      showTelega(TELEG_UID_2048);
     }
   }
 }
@@ -186,19 +180,27 @@ function rotate(times){
   }
 }
 
-/* ===== Directions ===== */
+/* ===== Directions (fixed) ===== */
 function move(dir){
   const before = JSON.stringify(grid);
 
-  if (dir === 2) rotate(2);
-  else if (dir === 1) rotate(3);
-  else if (dir === 3) rotate(1);
+  if (dir === 2) {         // right
+    rotate(2);
+  } else if (dir === 1) {  // up
+    rotate(3);
+  } else if (dir === 3) {  // down
+    rotate(1);
+  }
 
   for (let r = 0; r < size; r++) grid[r] = slide(grid[r]);
 
-  if (dir === 2) rotate(2);
-  else if (dir === 1) rotate(1);
-  else if (dir === 3) rotate(3);
+  if (dir === 2) {
+    rotate(2);
+  } else if (dir === 1) {
+    rotate(1);
+  } else if (dir === 3) {
+    rotate(3);
+  }
 
   const after = JSON.stringify(grid);
   if (before !== after) {
@@ -233,18 +235,20 @@ document.getElementById('left').onclick=()=>move(0);
 document.getElementById('up').onclick=()=>move(1);
 document.getElementById('right').onclick=()=>move(2);
 document.getElementById('down').onclick=()=>move(3);
+
+/* الأزرار الأصلية (مخفيّة) – نفس الـ handlers */
 document.getElementById('new').onclick=()=>setup();
 document.getElementById('about').onclick=()=>alert('2048 Mini — MVP.');
 document.getElementById('share').onclick=()=>{
-  const link = buildInviteLink();
-  const text=`I scored ${score} in 2048 Mini! Play here: ${link}`;
-  if(navigator.share){navigator.share({text, url: link});}
-  else {prompt('Copy and share:', text);}
+  const text=`I scored ${score} in 2048 Mini!`;
+  if(navigator.share){navigator.share({text});}
+  else {prompt('Copy and share your score:', text);}
 };
+
 gridEl.addEventListener('touchstart',touchStart); gridEl.addEventListener('touchend',touchEnd);
 gridEl.addEventListener('mousedown',touchStart); gridEl.addEventListener('mouseup',touchEnd);
 
-/* ===== AdsGram: interstitial & reward ===== */
+/* ===== AdsGram: init + end game ad ===== */
 let AdController = null;
 if (window.Adsgram && typeof window.Adsgram.init === "function") {
   AdController = window.Adsgram.init({ blockId: "int-14155" });
@@ -253,6 +257,8 @@ function showInterstitialAd(){
   if (!AdController || typeof AdController.show !== "function") return Promise.resolve();
   return AdController.show().catch(()=>{});
 }
+
+/* ===== AdsGram: Reward setup ===== */
 let RewardController = null;
 if (window.Adsgram && typeof window.Adsgram.init === "function") {
   RewardController = window.Adsgram.init({ blockId: "14159" });
@@ -262,11 +268,11 @@ function showRewardAd(){
     return Promise.resolve(false);
   }
   return RewardController.show()
-    .then(()=> true)
+    .then(res => true)
     .catch(()=> false);
 }
 
-/* ===== Revive logic ===== */
+/* ✅ reviveBoard */
 function reviveBoard(){
   const filled=[];
   for(let r=0;r<size;r++) for(let c=0;c<size;c++){
@@ -279,18 +285,8 @@ function reviveBoard(){
   updateBest();
 }
 
-/* ===== endGame flow ===== */
+/* ✅ endGame */
 function endGame(){
-  if (extraLives > 0) {
-    const useIt = confirm("Game over! Use your Extra Life to continue?");
-    if (useIt) {
-      extraLives -= 1;
-      reviveBoard();
-      draw();
-      return;
-    }
-  }
-
   if (!continuedOnce && RewardController) {
     const wantContinue = confirm("Game over! Your score: " + score + "\n\nWatch an ad to continue?");
     if (wantContinue) {
@@ -312,6 +308,24 @@ function endGame(){
 
   showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
 }
+
+/* ===== Drawer logic ===== */
+const drawer = document.getElementById('drawer');
+const backdrop = document.getElementById('backdrop');
+const menuBtn = document.getElementById('menuBtn');
+
+function openDrawer(){ drawer.classList.add('open'); backdrop.classList.add('show'); }
+function closeDrawer(){ drawer.classList.remove('open'); backdrop.classList.remove('show'); }
+
+menuBtn?.addEventListener('click', openDrawer);
+backdrop?.addEventListener('click', closeDrawer);
+
+// ربط عناصر القائمة بنفس أفعال الأزرار المخفية
+document.getElementById('m-new')?.addEventListener('click', ()=>{ closeDrawer(); document.getElementById('new')?.click(); });
+document.getElementById('m-share')?.addEventListener('click', ()=>{ closeDrawer(); document.getElementById('share')?.click(); });
+document.getElementById('m-about')?.addEventListener('click', ()=>{ closeDrawer(); document.getElementById('about')?.click(); });
+// لو هيضاف Invite مستقبلاً:
+// document.getElementById('m-invite')?.addEventListener('click', ()=>{ closeDrawer(); document.getElementById('invite')?.click(); });
 
 /* ===== Start ===== */
 setup();
