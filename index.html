@@ -93,9 +93,58 @@
     .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
 
     small{opacity:.7}
+
+    /* ===== Splash Screen ===== */
+    .splash{
+      position:fixed; inset:0; z-index:1000;
+      background: radial-gradient(120% 120% at 50% -20%, #fdf7ea 0%, #efe6d9 45%, #e7dccf 100%);
+      display:flex; align-items:center; justify-content:center;
+      transition: opacity .35s ease, visibility .35s ease;
+    }
+    .splash.hide{ opacity:0; visibility:hidden; }
+    .splash-card{
+      width:min(88vw, 420px);
+      background:#ffffffcc;
+      border:1px solid #e9dfd3;
+      border-radius:18px;
+      box-shadow:0 10px 30px #00000014;
+      padding:18px 18px 14px;
+      text-align:center;
+      backdrop-filter: blur(4px);
+    }
+    .splash-logo{
+      width:100%; height:auto; border-radius:12px; display:block;
+    }
+    .splash-title{
+      margin:10px 0 6px; font-weight:800; letter-spacing:.4px;
+      color:#5a4a3d;
+    }
+    .splash-sub{margin:0 0 8px; color:#7b6d61; font-weight:600; font-size:14px;}
+    .bar{
+      height:8px; width:100%; background:#eadfce; border-radius:999px; overflow:hidden;
+    }
+    .bar>span{
+      display:block; height:100%; width:0%;
+      background:linear-gradient(90deg,#8f7a66,#b59d84);
+      border-radius:999px; animation:fill 2.2s ease forwards;
+    }
+    @keyframes fill { to{ width:100% } }
+    .tap-hint{margin-top:8px; font-size:12px; color:#998a7f;}
   </style>
 </head>
 <body>
+
+<!-- ===== Splash ===== -->
+<div id="splash" class="splash">
+  <div class="splash-card" id="splashCard">
+    <img id="splashImg" class="splash-logo" alt="Earn USDT — 2048 Mini">
+    <h3 class="splash-title">Earn USDT while you play</h3>
+    <p class="splash-sub">Watch ads at milestones and collect rewards</p>
+    <div class="bar"><span></span></div>
+    <div class="tap-hint">Tap to continue</div>
+  </div>
+</div>
+
 <div class="wrap">
   <h1>2048 Mini</h1>
   <button id="menuBtn" class="menuBtn" aria-label="Menu">☰</button>
@@ -138,6 +187,20 @@
 /* ===== Telegram ===== */
 const tg = window.Telegram?.WebApp; if (tg) tg.expand();
 
+/* ===== Splash logic ===== */
+const SPLASH_IMG_URL = "PUT-YOUR-SPLASH-IMAGE-URL-HERE"; // ← حط لينك صورة اللوجو هنا
+const splash = document.getElementById('splash');
+const splashImg = document.getElementById('splashImg');
+
+function hideSplash(){
+  splash.classList.add('hide');
+  // يمنع إعادة الظهور لو رجع المستخدم Back/Forward
+  setTimeout(()=> splash.style.display='none', 400);
+}
+splashImg.src = SPLASH_IMG_URL;
+splash.addEventListener('click', hideSplash);
+window.addEventListener('load', () => setTimeout(hideSplash, 2200));
+
 /* ===== Game State ===== */
 const size=4; let grid=[], score=0, best=+localStorage.getItem('best2048')||0;
 const gridEl=document.getElementById('grid'); const scoreEl=document.getElementById('score'); const bestEl=document.getElementById('best');
@@ -164,14 +227,9 @@ const baseRewards = {
   2048: 0.002
 };
 
-/* عدّاد مرات الوصول لكل ميلستون داخل الجيم الحالي (لتحديد أول مرة/تكرار) */
+/* عدّاد مرات الوصول لكل ميلستون داخل الجيم الحالي */
 let msRunCount = { 256:0, 512:0, 1024:0, 2048:0 };
-
-/* عشان ما نعيدش المعالجة لنفس البلاط في كل draw:
-   بنخزن "أكبر عدد بلاطات" شفناه لكل ميلستون لحد دلوقتي في نفس الجيم */
 let msSeenTilesInRun = { 256:0, 512:0, 1024:0, 2048:0 };
-
-/* فلاغ: أول 2048 حصل في الجيم الحالي؟ */
 let reached2048InRun = false;
 
 /* ===== AdsGram: interstitial & rewarded ===== */
@@ -194,7 +252,7 @@ function showRewardAd(){
   return RewardController.show().then(()=> true).catch(()=> false);
 }
 
-/* ===== منطق صرف المكافأة وفق القواعد ===== */
+/* ===== منطق صرف المكافأة وفق القواعد (اختياري) ===== */
 function offerAndMaybeAward(ms, tier){ // tier: 'full' | 'half'
   const base = baseRewards[ms]; if (!base) return;
   const amount = (tier === 'full') ? base : base/2;
@@ -204,18 +262,12 @@ function offerAndMaybeAward(ms, tier){ // tier: 'full' | 'half'
 ${tier==='full' ? 'Claim ' : 'Claim (half) '} $${amount.toFixed(4)} by watching an ad?
 OK = Watch & claim,  Cancel = Skip`
   );
-  if (!want) return; // Skip
+  if (!want) return;
 
   showRewardAd().then(ok=>{
     if (!ok) return;
-    // Award balance
     setBalance(getBalance() + amount);
-
-    // Extra life عند 512 و2048
-    if (ms === 512 || ms === 2048) {
-      extraLives += 1;
-    }
-
+    if (ms === 512 || ms === 2048) { extraLives += 1; }
     alert(`✅ Reward added: $${amount.toFixed(4)}${(ms===512||ms===2048)?' + Extra Life':''}`);
   });
 }
@@ -242,7 +294,6 @@ function setup(){
 function draw(){
   gridEl.innerHTML=''; scoreEl.textContent=score; bestEl.textContent=best;
 
-  // ارصد عدد البلاطات لكل ميلستون في الحالة الحالية
   const currentCounts = {256:0,512:0,1024:0,2048:0};
 
   for(let r=0;r<size;r++)for(let c=0;c<size;c++){
@@ -254,23 +305,16 @@ function draw(){
 
     if (v===256||v===512||v===1024||v===2048) currentCounts[v]++;
 
-    // الإعلانات القديمة بتاعة Telega (لو لسه عايزها)
     if (v === 1024 && !shown1024Ad) { shown1024Ad = true; showTelega(TELEG_UID_1024); }
     if (v === 2048 && !shown2048Ad) { shown2048Ad = true; showTelega(TELEG_UID_2048); }
   }
 
-  // معالجة الزيادات الجديدة في عدد البلاطات (ظهور جديد فعلي)
   [256,512,1024,2048].forEach(ms=>{
     const prev = msSeenTilesInRun[ms] || 0;
     const now  = currentCounts[ms] || 0;
     const delta = Math.max(0, now - prev);
     if (delta > 0){
-      // لكل ظهور جديد (ممكن يبقوا اتنين في حركة واحدة)
       for (let i=0;i<delta;i++){
-        // نحدد نوع المكافأة وفق قواعدك:
-        // - أول مرة لنفس الميلستون في الجيم => full
-        // - تكرار قبل أول 2048 => none
-        // - تكرار بعد أول 2048 => half
         let tier = 'none';
         if (msRunCount[ms] === 0){
           tier = 'full';
@@ -280,27 +324,17 @@ function draw(){
           tier = 'none';
         }
 
-        // حدث “تحقق أول 2048” قبل معالجة نص القيمة التالية
         if (ms === 2048 && msRunCount[2048] === 0){
-          // أول مرة نوصل 2048 في الجيم
           reached2048InRun = true;
         }
 
-        // زوّد عداد الوصول (حصلت milestone حتى لو المستخدم Skip)
         msRunCount[ms]++;
 
-        if (tier === 'full'){
-          offerAndMaybeAward(ms, 'full');
-        } else if (tier === 'half'){
-          offerAndMaybeAward(ms, 'half');
-        }
-        // tier === 'none' => مفيش فلوس
+        if (tier === 'full'){ offerAndMaybeAward(ms, 'full'); }
+        else if (tier === 'half'){ offerAndMaybeAward(ms, 'half'); }
       }
-
-      // حدّث عدد البلاطات المشفوعة
       msSeenTilesInRun[ms] = now;
     } else {
-      // لو مفيش زيادة، خليه زي ما هو
       msSeenTilesInRun[ms] = now;
     }
   });
