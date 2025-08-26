@@ -29,6 +29,7 @@
     function showTelega(uid) {
       try {
         if (window.ads && typeof window.ads.ad_show === "function") {
+          // ملاحظة: الخاصية الصحيحة Uuid
           return window.ads.ad_show({ adBlockUuid: uid });
         } else if (telegaAds && typeof telegaAds.show === "function") {
           return telegaAds.show();
@@ -41,46 +42,72 @@
   </script>
 
   <style>
-    body{font-family:system-ui,Arial;padding:16px;margin:0;background:#faf8ef;color:#776e65;}
-    .wrap{max-width:420px;margin:0 auto;text-align:center}
+    :root{
+      --bg:#faf8ef;
+      --board:#bbada0;
+      --tile:#cdc1b4;
+      --text:#776e65;
+      --btn:#8f7a66;
+      --white:#fff;
+    }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,Arial;padding:16px;margin:0;background:var(--bg);color:var(--text);}
+    .wrap{max-width:480px;margin:0 auto;position:relative}
+    h1{margin:0 0 8px;font-size:40px;line-height:1.1;padding-right:120px}
 
-    /* Header with menu */
-    .header{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px}
-    .header h1{margin:0}
-    .menu-btn{padding:8px 12px;border:0;border-radius:10px;background:#8f7a66;color:#fff;font-weight:700;cursor:pointer}
-
+    /* Top cards */
     .top{display:flex;gap:8px;justify-content:center;margin-bottom:8px}
-    .card{background:#bbada0;color:#fff;border-radius:12px;padding:8px 12px;min-width:100px}
-    .grid{background:#bbada0;border-radius:12px;padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;touch-action:none}
-    .cell{height:80px;background:#cdc1b4;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px}
+    .card{background:var(--board);color:var(--white);border-radius:12px;padding:8px 12px;min-width:120px}
 
-    /* Bigger arrow buttons */
-    .btns{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
-    .btns button{padding:16px 0;border:0;border-radius:12px;font-weight:800;background:#8f7a66;color:#fff;font-size:20px;cursor:pointer}
+    /* Board */
+    .grid{background:var(--board);border-radius:12px;padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;touch-action:none}
+    .cell{height:86px;background:var(--tile);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:26px}
 
-    /* Drawer (side menu) */
-    .backdrop{position:fixed;inset:0;background:#0008;opacity:0;pointer-events:none;transition:.2s}
-    .backdrop.show{opacity:1;pointer-events:auto}
-    .drawer{position:fixed;top:0;right:-280px;height:100dvh;width:280px;background:#f5efe6;
-      box-shadow:0 0 30px #0003;padding:16px;transition:.25s}
-    .drawer.open{right:0}
-    .drawer h3{margin:0 0 12px;color:#8f7a66}
-    .drawer .menu-item{display:block;width:100%;text-align:left;margin:8px 0;padding:12px;border:0;border-radius:10px;
-      background:#8f7a66;color:#fff;font-weight:700;cursor:pointer}
+    /* Bigger arrows area */
+    .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px;justify-items:center;align-items:center}
+    .controls .spacer{height:0}
+    button{
+      padding:14px 16px;border:0;border-radius:14px;font-weight:700;background:var(--btn);color:var(--white);cursor:pointer;
+      min-width:96px;min-height:64px;font-size:22px;
+    }
+    .arrow{min-width:120px;min-height:76px;font-size:24px}
 
-    /* Hide legacy action buttons container (we keep them for their handlers) */
-    .hidden-actions{display:none}
     small{opacity:.7}
+
+    /* Menu button */
+    .menuBtn{
+      position:absolute; top:8px; right:0;
+      background:var(--btn); color:#fff; border:0; border-radius:12px;
+      padding:10px 14px; font-weight:700; cursor:pointer; min-width:auto; min-height:auto; font-size:16px;
+    }
+
+    /* Backdrop */
+    .backdrop{
+      position:fixed; inset:0; background:#0007; display:none;
+    }
+    .backdrop.show{ display:block; }
+
+    /* Drawer (side menu) — hidden completely until open */
+    .drawer{
+      position:fixed; top:0; right:0; height:100dvh; width:280px;
+      background:#f5efe6; box-shadow:0 0 30px #0003; padding:16px 14px;
+      transform: translateX(100%);           /* hidden fully */
+      transition: transform .25s ease;
+      will-change: transform;
+      z-index:10;
+    }
+    .drawer.open{ transform: translateX(0); }
+
+    .drawer h3{margin:4px 0 12px}
+    .drawer .menuItem{display:block;width:100%;margin:8px 0;padding:12px 14px;background:var(--btn);color:#fff;border:0;border-radius:12px;font-weight:700;cursor:pointer}
   </style>
 </head>
 <body>
 <div class="wrap">
+  <h1>2048 Mini</h1>
 
-  <!-- Header with Menu -->
-  <div class="header">
-    <h1>2048 Mini</h1>
-    <button id="menuBtn" class="menu-btn">Menu ☰</button>
-  </div>
+  <!-- Menu Button -->
+  <button id="menuBtn" class="menuBtn">Menu ☰</button>
 
   <div class="top">
     <div class="card">Score<br><b id="score">0</b></div>
@@ -89,35 +116,28 @@
 
   <div class="grid" id="grid"></div>
 
-  <!-- Arrows only -->
-  <div class="btns">
-    <span></span><button id="up">▲</button><span></span>
-    <button id="left">◀</button><button id="down">▼</button><button id="right">▶</button>
+  <!-- Bigger arrow controls only -->
+  <div class="controls">
+    <span class="spacer"></span>
+    <button id="up" class="arrow">▲</button>
+    <span class="spacer"></span>
+
+    <button id="left" class="arrow">◀</button>
+    <button id="down" class="arrow">▼</button>
+    <button id="right" class="arrow">▶</button>
   </div>
 
-  <!-- (Removed helper text to give more space) -->
-  <!-- <p><small>Swipe on the board or use the arrows. MVP build.</small></p> -->
-
-  <!-- Hidden original action buttons (to keep same IDs/handlers) -->
-  <div class="hidden-actions">
-    <button id="new">New Game</button>
-    <button id="share">Share</button>
-    <button id="about">About</button>
-    <!-- لو عندك Invite لاحقًا خليه هنا بنفس الـ ID القديم -->
-    <!-- <button id="invite">Invite Friend</button> -->
-  </div>
+  <p><small>Swipe on the board or use the arrows. MVP build.</small></p>
 </div>
 
-<!-- Drawer UI -->
+<!-- Side Drawer + Backdrop -->
 <div id="backdrop" class="backdrop"></div>
-<div id="drawer" class="drawer">
+<div id="drawer" class="drawer" role="dialog" aria-modal="true" aria-label="Menu">
   <h3>Menu</h3>
-  <button class="menu-item" id="m-new">New Game</button>
-  <button class="menu-item" id="m-share">Share</button>
-  <button class="menu-item" id="m-about">About</button>
-  <!-- لو ضفت زر Invite مستقبلاً:
-  <button class="menu-item" id="m-invite">Invite Friend</button>
-  -->
+  <button id="mNew"   class="menuItem">New Game</button>
+  <button id="mInvite" class="menuItem">Invite Friend</button>
+  <button id="mShare" class="menuItem">Share</button>
+  <button id="mAbout" class="menuItem">About</button>
 </div>
 
 <script>
@@ -222,7 +242,7 @@ function gameOver(){
 }
 function updateBest(){ if(score>best){ best=score; localStorage.setItem('best2048', best); }}
 
-/* ===== Inputs ===== */
+/* ===== Inputs (swipe/mouse) ===== */
 const startPos={x:0,y:0}; let dragging=false;
 function touchStart(e){dragging=true; const t=e.touches?e.touches[0]:e; startPos.x=t.clientX; startPos.y=t.clientY;}
 function touchEnd(e){
@@ -231,22 +251,53 @@ function touchEnd(e){
   const dx=t.clientX-startPos.x, dy=t.clientY-startPos.y;
   if(Math.abs(dx)>Math.abs(dy)){ move(dx>0?2:0); } else { move(dy>0?3:1); }
 }
+gridEl.addEventListener('touchstart',touchStart); gridEl.addEventListener('touchend',touchEnd);
+gridEl.addEventListener('mousedown',touchStart); gridEl.addEventListener('mouseup',touchEnd);
+
+/* ===== Arrow buttons ===== */
 document.getElementById('left').onclick=()=>move(0);
 document.getElementById('up').onclick=()=>move(1);
 document.getElementById('right').onclick=()=>move(2);
 document.getElementById('down').onclick=()=>move(3);
 
-/* الأزرار الأصلية (مخفيّة) – نفس الـ handlers */
-document.getElementById('new').onclick=()=>setup();
-document.getElementById('about').onclick=()=>alert('2048 Mini — MVP.');
-document.getElementById('share').onclick=()=>{
+/* ===== Menu: open/close ===== */
+const menuBtn   = document.getElementById('menuBtn');
+const drawer    = document.getElementById('drawer');
+const backdrop  = document.getElementById('backdrop');
+
+function openDrawer(){ drawer.classList.add('open'); backdrop.classList.add('show'); }
+function closeDrawer(){ drawer.classList.remove('open'); backdrop.classList.remove('show'); }
+
+menuBtn.addEventListener('click', openDrawer);
+backdrop.addEventListener('click', closeDrawer);
+
+/* ===== Menu actions ===== */
+document.getElementById('mNew').onclick = ()=>{ closeDrawer(); setup(); };
+
+function buildInviteLink(){
+  const link = 'https://t.me/Smart2048_bot'; // نفس اللينك العام (ماغيرتش لوجيك الإحالات)
+  return link;
+}
+
+document.getElementById('mInvite').onclick = ()=>{
+  closeDrawer();
+  const link = buildInviteLink();
+  const msg = `Come play 2048 Mini! ${link}`;
+  if(navigator.share){ navigator.share({ text: msg, url: link }).catch(()=> prompt('Copy link:', link)); }
+  else{ prompt('Copy link:', link); }
+};
+
+document.getElementById('mShare').onclick = ()=>{
+  closeDrawer();
   const text=`I scored ${score} in 2048 Mini!`;
   if(navigator.share){navigator.share({text});}
   else {prompt('Copy and share your score:', text);}
 };
 
-gridEl.addEventListener('touchstart',touchStart); gridEl.addEventListener('touchend',touchEnd);
-gridEl.addEventListener('mousedown',touchStart); gridEl.addEventListener('mouseup',touchEnd);
+document.getElementById('mAbout').onclick = ()=>{
+  closeDrawer();
+  alert('2048 Mini — MVP.');
+};
 
 /* ===== AdsGram: init + end game ad ===== */
 let AdController = null;
@@ -305,27 +356,8 @@ function endGame(){
       return;
     }
   }
-
   showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
 }
-
-/* ===== Drawer logic ===== */
-const drawer = document.getElementById('drawer');
-const backdrop = document.getElementById('backdrop');
-const menuBtn = document.getElementById('menuBtn');
-
-function openDrawer(){ drawer.classList.add('open'); backdrop.classList.add('show'); }
-function closeDrawer(){ drawer.classList.remove('open'); backdrop.classList.remove('show'); }
-
-menuBtn?.addEventListener('click', openDrawer);
-backdrop?.addEventListener('click', closeDrawer);
-
-// ربط عناصر القائمة بنفس أفعال الأزرار المخفية
-document.getElementById('m-new')?.addEventListener('click', ()=>{ closeDrawer(); document.getElementById('new')?.click(); });
-document.getElementById('m-share')?.addEventListener('click', ()=>{ closeDrawer(); document.getElementById('share')?.click(); });
-document.getElementById('m-about')?.addEventListener('click', ()=>{ closeDrawer(); document.getElementById('about')?.click(); });
-// لو هيضاف Invite مستقبلاً:
-// document.getElementById('m-invite')?.addEventListener('click', ()=>{ closeDrawer(); document.getElementById('invite')?.click(); });
 
 /* ===== Start ===== */
 setup();
