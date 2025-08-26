@@ -50,15 +50,14 @@
     *{box-sizing:border-box}
     body{font-family:system-ui,Arial;padding:16px;margin:0;background:var(--bg);color:var(--text);}
     .wrap{max-width:480px;margin:0 auto;position:relative}
-    h1{margin:0 0 8px;font-size:36px;line-height:1.1;padding-right:120px}
+    h1{margin:0 0 8px;font-size:32px;line-height:1.1;padding-right:90px}
 
     .top{display:flex;gap:8px;justify-content:center;margin-bottom:8px}
-    .card{background:var(--board);color:var(--white);border-radius:12px;padding:8px 12px;min-width:100px}
+    .card{background:var(--board);color:var(--white);border-radius:12px;padding:8px 12px;min-width:100px;text-align:center}
 
     .grid{background:var(--board);border-radius:12px;padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;touch-action:none}
     .cell{height:80px;background:var(--tile);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px}
 
-    /* أصغر حجم للأزرار */
     .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;justify-items:center;align-items:center}
     .controls .spacer{height:0}
     button{
@@ -69,17 +68,18 @@
 
     small{opacity:.7}
 
+    /* زرار المنيو صغير */
     .menuBtn{
       position:absolute; top:8px; right:0;
-      background:var(--btn); color:#fff; border:0; border-radius:12px;
-      padding:8px 12px; font-weight:700; cursor:pointer; font-size:16px;
+      background:var(--btn); color:#fff; border:0; border-radius:10px;
+      padding:6px 10px; font-weight:600; cursor:pointer; font-size:14px;
     }
 
     .backdrop{position:fixed; inset:0; background:#0007; display:none;}
     .backdrop.show{ display:block; }
 
     .drawer{
-      position:fixed; top:0; right:0; height:100dvh; width:260px;
+      position:fixed; top:0; right:0; height:100dvh; width:240px;
       background:#f5efe6; box-shadow:0 0 30px #0003; padding:16px 14px;
       transform: translateX(100%); transition: transform .25s ease; z-index:10;
     }
@@ -92,7 +92,7 @@
 <body>
 <div class="wrap">
   <h1>2048 Mini</h1>
-  <button id="menuBtn" class="menuBtn">Menu ☰</button>
+  <button id="menuBtn" class="menuBtn">☰</button>
 
   <div class="top">
     <div class="card">Score<br><b id="score">0</b></div>
