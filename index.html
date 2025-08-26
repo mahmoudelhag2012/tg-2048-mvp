@@ -11,7 +11,7 @@
   <!-- AdsGram SDK -->
   <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 
-  <!-- Telega.io SDK -->
+  <!-- Telega.io SDK (موجود كما هو، مش بنستخدمه هنا) -->
   <script src="https://inapp.telega.io/sdk/v1/sdk.js"></script>
   <script>
     var telegaAds = null;
@@ -56,14 +56,17 @@
     .grid{background:var(--board);border-radius:12px;padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;touch-action:none}
     .cell{height:80px;background:var(--tile);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px}
 
+    /* أزرار عامة */
     button{
       padding:10px 12px;border:0;border-radius:12px;font-weight:700;background:var(--btn);color:var(--white);cursor:pointer;
     }
 
+    /* أزرار الاتجاهات فقط */
     .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;justify-items:center;align-items:center}
     .controls .spacer{height:0}
     .arrow{min-width:96px;min-height:66px;font-size:20px}
 
+    /* زرار المنيو الصغير */
     .menuBtn{
       position:absolute; top:8px; right:8px;
       width:32px; height:32px; padding:0;
@@ -74,6 +77,7 @@
       font-size:18px; font-weight:900; z-index:11;
     }
 
+    /* الـ Drawer */
     .backdrop{position:fixed; inset:0; background:#0007; display:none;}
     .backdrop.show{ display:block; }
 
@@ -85,7 +89,8 @@
     .drawer.open{ transform: translateX(0); }
     .drawer h3{margin:4px 0 12px}
     .menuItem{display:block;width:100%;margin:8px 0;padding:12px 14px;background:var(--btn);color:#fff;border:0;border-radius:12px;font-weight:700;cursor:pointer}
-    .menuItem[disabled]{opacity:.8;cursor:default}
+    .menuInfo{margin:6px 0 10px;font-weight:700;color:#333}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
 
     small{opacity:.7}
   </style>
@@ -119,37 +124,121 @@
 <div id="backdrop" class="backdrop"></div>
 <div id="drawer" class="drawer">
   <h3>Menu</h3>
+
+  <!-- ✅ Balance فقط في المنيو -->
+  <div class="menuInfo">Balance (USDT): <span id="balance" class="mono">0.0000</span></div>
+
   <button id="mNew" class="menuItem">New Game</button>
   <button id="mInvite" class="menuItem">Invite Friend</button>
   <button id="mShare" class="menuItem">Share</button>
   <button id="mAbout" class="menuItem">About</button>
-  <button id="mBalance" class="menuItem" disabled>Balance: $0.0000</button>
 </div>
 
 <script>
-/* Telegram */
+/* ===== Telegram ===== */
 const tg = window.Telegram?.WebApp; if (tg) tg.expand();
 
-/* Game State */
+/* ===== Game State ===== */
 const size=4; let grid=[], score=0, best=+localStorage.getItem('best2048')||0;
 const gridEl=document.getElementById('grid'); const scoreEl=document.getElementById('score'); const bestEl=document.getElementById('best');
 
-/* Balance */
-let userBalance = parseFloat(localStorage.getItem('usdBalance') || '0');
-function renderBalance(){
-  const el=document.getElementById('mBalance');
-  if (el) el.textContent = "Balance: $" + userBalance.toFixed(4);
+/* ===== Balance / Rewards ===== */
+const balanceEl = document.getElementById('balance');
+function getBalance(){ return +(localStorage.getItem('usdBalance')||'0'); }
+function setBalance(v){
+  const fixed = Math.max(0, v);
+  localStorage.setItem('usdBalance', fixed.toFixed(4));
+  updateBalanceUI();
+}
+function updateBalanceUI(){ balanceEl.textContent = (+localStorage.getItem('usdBalance')||0).toFixed(4); }
+updateBalanceUI();
+
+/* Extra lives (نعدّها هنا، من غير ربطها بالـendGame لسه) */
+let extraLives = 0;
+
+/* مكافآت الأساس */
+const baseRewards = {
+  256: 0.0002,
+  512: 0.0003,
+  1024: 0.0015,
+  2048: 0.002
+};
+
+/* فلّاجات الجولة الحالية (مرة واحدة لكل جيم) */
+let awardedRun = { 256:false, 512:false, 1024:false, 2048:false };
+
+/* عدّادات تاريخية لكل ميلستون لتحديد أول مرة/نص القيمة */
+function getMsCount(ms){ return +(localStorage.getItem('msCount_'+ms)||'0'); }
+function incMsCount(ms){ localStorage.setItem('msCount_'+ms, String(getMsCount(ms)+1)); }
+
+/* ===== AdsGram: interstitial & rewarded ===== */
+let AdController = null;
+if (window.Adsgram && typeof window.Adsgram.init === "function") {
+  AdController = window.Adsgram.init({ blockId: "int-14155" });
+}
+function showInterstitialAd(){
+  if (!AdController || typeof AdController.show !== "function") return Promise.resolve();
+  return AdController.show().catch(()=>{});
+}
+let RewardController = null;
+if (window.Adsgram && typeof window.Adsgram.init === "function") {
+  RewardController = window.Adsgram.init({ blockId: "14159" }); // Reward block
+}
+function showRewardAd(){
+  if (!RewardController || typeof RewardController.show !== "function") {
+    return Promise.resolve(false);
+  }
+  return RewardController.show()
+    .then(()=> true)
+    .catch(()=> false);
 }
 
-/* Flags */
+/* ===== منطق صرف المكافأة (مرة/جيم + نصف القيمة لاحقًا) ===== */
+function tryAwardMilestone(ms){
+  if (awardedRun[ms]) return; // بالفعل اتصرف في الجولة دي
+  const base = baseRewards[ms];
+  if (!base) return;
+
+  // أول مرة تاريخيًا = كامل القيمة، غير كده = نص القيمة
+  const historicalCount = getMsCount(ms);
+  const amount = historicalCount === 0 ? base : base/2;
+
+  // لازم إعلان Rewarded ينجح
+  showRewardAd().then(ok=>{
+    if (!ok) return;
+    awardedRun[ms] = true;
+    incMsCount(ms);
+
+    // أضف الرصيد
+    const newBal = getBalance() + amount;
+    setBalance(newBal);
+
+    // Extra life عند 512 و 2048
+    if (ms === 512 || ms === 2048) {
+      extraLives += 1;
+    }
+
+    // إشعار بسيط
+    alert(`✅ Reward added: $${amount.toFixed(4)}${(ms===512||ms===2048)?' + Extra Life':''}`);
+  });
+}
+
+/* ===== Flags أخرى قديمة في الكود ===== */
 let continuedOnce = false;
 let shown1024Ad = false;
 let shown2048Ad = false;
 
+/* ===== Core game ===== */
 function emptyGrid(){grid=Array.from({length:size},()=>Array(size).fill(0));}
 function randomEmpty(){const e=[]; for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(!grid[r][c])e.push([r,c]); return e.length?e[Math.floor(Math.random()*e.length)]:null;}
 function addTile(){const pos=randomEmpty(); if(!pos) return false; grid[pos[0]][pos[1]] = Math.random()<0.9?2:4; return true;}
-function setup(){emptyGrid(); addTile(); addTile(); score=0; continuedOnce=false; shown1024Ad=false; shown2048Ad=false; draw(); renderBalance();}
+function setup(){
+  emptyGrid(); addTile(); addTile();
+  score=0;
+  continuedOnce=false; shown1024Ad=false; shown2048Ad=false;
+  awardedRun = {256:false,512:false,1024:false,2048:false}; // reset per-run flags
+  draw();
+}
 
 function draw(){
   gridEl.innerHTML=''; scoreEl.textContent=score; bestEl.textContent=best;
@@ -160,8 +249,15 @@ function draw(){
     d.style.color=v>=8?'#f9f6f2':'#776e65';
     gridEl.appendChild(d);
 
+    // تشغيل إعلانات Telega للميلستون (لو عايزها تفضل كما هي)
     if (v === 1024 && !shown1024Ad) { shown1024Ad = true; showTelega(TELEG_UID_1024); }
     if (v === 2048 && !shown2048Ad) { shown2048Ad = true; showTelega(TELEG_UID_2048); }
+
+    // 🔔 مكافآت AdsGram Rewarded (مرّة/جيم، ونص في الجيمات التالية)
+    if (v === 256 && !awardedRun[256])  tryAwardMilestone(256);
+    if (v === 512 && !awardedRun[512])  tryAwardMilestone(512);
+    if (v === 1024 && !awardedRun[1024]) tryAwardMilestone(1024);
+    if (v === 2048 && !awardedRun[2048]) tryAwardMilestone(2048);
   }
 }
 function tileColor(v){
@@ -170,7 +266,9 @@ function tileColor(v){
 }
 function slide(row){
   const f=row.filter(x=>x);
-  for(let i=0;i<f.length-1;i++){ if(f[i]===f[i+1]){ f[i]*=2; score+=f[i]; f.splice(i+1,1); } }
+  for(let i=0;i<f.length-1;i++){
+    if(f[i]===f[i+1]){ f[i]*=2; score+=f[i]; f.splice(i+1,1); }
+  }
   while(f.length<size) f.push(0);
   return f;
 }
@@ -181,6 +279,8 @@ function rotate(times){
     grid=g;
   }
 }
+
+/* Directions */
 function move(dir){
   const before = JSON.stringify(grid);
   if (dir === 2) rotate(2); else if (dir === 1) rotate(3); else if (dir === 3) rotate(1);
@@ -189,6 +289,7 @@ function move(dir){
   const after = JSON.stringify(grid);
   if (before !== after) { addTile(); updateBest(); draw(); if (gameOver()) endGame(); }
 }
+
 function gameOver(){
   if(randomEmpty()) return false;
   for(let r=0;r<size;r++)for(let c=0;c<size;c++){
@@ -217,7 +318,7 @@ document.getElementById('up').onclick=()=>move(1);
 document.getElementById('right').onclick=()=>move(2);
 document.getElementById('down').onclick=()=>move(3);
 
-/* Drawer */
+/* Drawer control */
 const menuBtn=document.getElementById('menuBtn');
 const drawer=document.getElementById('drawer');
 const backdrop=document.getElementById('backdrop');
@@ -231,17 +332,10 @@ document.getElementById('mInvite').onclick=()=>{ closeDrawer(); prompt('Copy lin
 document.getElementById('mShare').onclick=()=>{ closeDrawer(); const text=`I scored ${score} in 2048 Mini!`; if(navigator.share){navigator.share({text});} else {prompt('Copy and share your score:', text);} };
 document.getElementById('mAbout').onclick=()=>{ closeDrawer(); alert('2048 Mini — MVP.'); };
 
-/* AdsGram */
-let AdController=null;
-if(window.Adsgram&&typeof window.Adsgram.init==="function"){ AdController=window.Adsgram.init({blockId:"int-14155"}); }
-function showInterstitialAd(){ if(!AdController||typeof AdController.show!=="function") return Promise.resolve(); return AdController.show().catch(()=>{}); }
-
-let RewardController=null;
-if(window.Adsgram&&typeof window.Adsgram.init==="function"){ RewardController=window.Adsgram.init({blockId:"14159"}); }
-function showRewardAd(){ if(!RewardController||typeof RewardController.show!=="function"){return Promise.resolve(false);} return RewardController.show().then(()=>true).catch(()=>false); }
-
+/* Revive + end (بدون ربط extraLives حالياً) */
 function reviveBoard(){
-  const filled=[]; for(let r=0;r<size;r++) for(let c=0;c<size;c++){ if(grid[r][c]!==0) filled.push([r,c]); }
+  const filled=[];
+  for(let r=0;r<size;r++) for(let c=0;c<size;c++){ if(grid[r][c]!==0) filled.push([r,c]); }
   if(filled.length){ const [rr,cc]=filled[Math.floor(Math.random()*filled.length)]; grid[rr][cc]=0; }
   updateBest();
 }
@@ -264,6 +358,12 @@ function endGame(){
 
 /* Start */
 setup();
+
+/* Drawer wiring (موجودة فوق، بس هنا بعد DOM جاهز) */
+document.getElementById('mNew');
+document.getElementById('mInvite');
+document.getElementById('mShare');
+document.getElementById('mAbout');
 </script>
 </body>
 </html>
