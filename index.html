@@ -21,15 +21,12 @@
       });
     }
 
-    // UIDs الخاصة ببلوكات Telega
     const TELEG_UID_1024 = "3a1f1a7a-028c-4909-b20b-f4733d02fcc5";
-    const TELEG_UID_2048 = "6a5cb9ac-15d0-4da2-bbca-916236f1bc83"; // ← بلوك 2048
+    const TELEG_UID_2048 = "6a5cb9ac-15d0-4da2-bbca-916236f1bc83";
 
-    // دالة مساعدة: تحاول تستخدم طريقة Telega المناسبة المتاحة
     function showTelega(uid) {
       try {
         if (window.ads && typeof window.ads.ad_show === "function") {
-          // ملاحظة: الخاصية الصحيحة Uuid
           return window.ads.ad_show({ adBlockUuid: uid });
         } else if (telegaAds && typeof telegaAds.show === "function") {
           return telegaAds.show();
@@ -53,48 +50,38 @@
     *{box-sizing:border-box}
     body{font-family:system-ui,Arial;padding:16px;margin:0;background:var(--bg);color:var(--text);}
     .wrap{max-width:480px;margin:0 auto;position:relative}
-    h1{margin:0 0 8px;font-size:40px;line-height:1.1;padding-right:120px}
+    h1{margin:0 0 8px;font-size:36px;line-height:1.1;padding-right:120px}
 
-    /* Top cards */
     .top{display:flex;gap:8px;justify-content:center;margin-bottom:8px}
-    .card{background:var(--board);color:var(--white);border-radius:12px;padding:8px 12px;min-width:120px}
+    .card{background:var(--board);color:var(--white);border-radius:12px;padding:8px 12px;min-width:100px}
 
-    /* Board */
     .grid{background:var(--board);border-radius:12px;padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;touch-action:none}
-    .cell{height:86px;background:var(--tile);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:26px}
+    .cell{height:80px;background:var(--tile);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px}
 
-    /* Bigger arrows area */
-    .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px;justify-items:center;align-items:center}
+    /* أصغر حجم للأزرار */
+    .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;justify-items:center;align-items:center}
     .controls .spacer{height:0}
     button{
-      padding:14px 16px;border:0;border-radius:14px;font-weight:700;background:var(--btn);color:var(--white);cursor:pointer;
-      min-width:96px;min-height:64px;font-size:22px;
+      padding:10px 12px;border:0;border-radius:12px;font-weight:700;background:var(--btn);color:var(--white);cursor:pointer;
+      min-width:90px;min-height:60px;font-size:20px;
     }
-    .arrow{min-width:120px;min-height:76px;font-size:24px}
+    .arrow{font-size:22px}
 
     small{opacity:.7}
 
-    /* Menu button */
     .menuBtn{
       position:absolute; top:8px; right:0;
       background:var(--btn); color:#fff; border:0; border-radius:12px;
-      padding:10px 14px; font-weight:700; cursor:pointer; min-width:auto; min-height:auto; font-size:16px;
+      padding:8px 12px; font-weight:700; cursor:pointer; font-size:16px;
     }
 
-    /* Backdrop */
-    .backdrop{
-      position:fixed; inset:0; background:#0007; display:none;
-    }
+    .backdrop{position:fixed; inset:0; background:#0007; display:none;}
     .backdrop.show{ display:block; }
 
-    /* Drawer (side menu) — hidden completely until open */
     .drawer{
-      position:fixed; top:0; right:0; height:100dvh; width:280px;
+      position:fixed; top:0; right:0; height:100dvh; width:260px;
       background:#f5efe6; box-shadow:0 0 30px #0003; padding:16px 14px;
-      transform: translateX(100%);           /* hidden fully */
-      transition: transform .25s ease;
-      will-change: transform;
-      z-index:10;
+      transform: translateX(100%); transition: transform .25s ease; z-index:10;
     }
     .drawer.open{ transform: translateX(0); }
 
@@ -105,8 +92,6 @@
 <body>
 <div class="wrap">
   <h1>2048 Mini</h1>
-
-  <!-- Menu Button -->
   <button id="menuBtn" class="menuBtn">Menu ☰</button>
 
   <div class="top">
@@ -116,7 +101,6 @@
 
   <div class="grid" id="grid"></div>
 
-  <!-- Bigger arrow controls only -->
   <div class="controls">
     <span class="spacer"></span>
     <button id="up" class="arrow">▲</button>
@@ -130,28 +114,22 @@
   <p><small>Swipe on the board or use the arrows. MVP build.</small></p>
 </div>
 
-<!-- Side Drawer + Backdrop -->
 <div id="backdrop" class="backdrop"></div>
-<div id="drawer" class="drawer" role="dialog" aria-modal="true" aria-label="Menu">
+<div id="drawer" class="drawer">
   <h3>Menu</h3>
-  <button id="mNew"   class="menuItem">New Game</button>
+  <button id="mNew" class="menuItem">New Game</button>
   <button id="mInvite" class="menuItem">Invite Friend</button>
   <button id="mShare" class="menuItem">Share</button>
   <button id="mAbout" class="menuItem">About</button>
 </div>
 
 <script>
-/* ===== Telegram ===== */
 const tg = window.Telegram?.WebApp; if (tg) tg.expand();
 
-/* ===== Game State ===== */
 const size=4; let grid=[], score=0, best=+localStorage.getItem('best2048')||0;
 const gridEl=document.getElementById('grid'); const scoreEl=document.getElementById('score'); const bestEl=document.getElementById('best');
 
-/* ✅ فرصة متابعة واحدة لكل جولة */
 let continuedOnce = false;
-
-/* ✅ إعلانات milestone (Telega): 1024 + 2048 */
 let shown1024Ad = false;
 let shown2048Ad = false;
 
@@ -169,15 +147,8 @@ function draw(){
     d.style.color=v>=8?'#f9f6f2':'#776e65';
     gridEl.appendChild(d);
 
-    /* 🎯 milestone: أول مرة تظهر 1024/2048 اعرض إعلان Telega.io */
-    if (v === 1024 && !shown1024Ad) {
-      shown1024Ad = true;
-      showTelega(TELEG_UID_1024);
-    }
-    if (v === 2048 && !shown2048Ad) {
-      shown2048Ad = true;
-      showTelega(TELEG_UID_2048);
-    }
+    if (v === 1024 && !shown1024Ad) { shown1024Ad = true; showTelega(TELEG_UID_1024); }
+    if (v === 2048 && !shown2048Ad) { shown2048Ad = true; showTelega(TELEG_UID_2048); }
   }
 }
 function tileColor(v){
@@ -200,166 +171,48 @@ function rotate(times){
   }
 }
 
-/* ===== Directions (fixed) ===== */
 function move(dir){
   const before = JSON.stringify(grid);
-
-  if (dir === 2) {         // right
-    rotate(2);
-  } else if (dir === 1) {  // up
-    rotate(3);
-  } else if (dir === 3) {  // down
-    rotate(1);
-  }
-
-  for (let r = 0; r < size; r++) grid[r] = slide(grid[r]);
-
-  if (dir === 2) {
-    rotate(2);
-  } else if (dir === 1) {
-    rotate(1);
-  } else if (dir === 3) {
-    rotate(3);
-  }
-
+  if (dir === 2) rotate(2); else if (dir === 1) rotate(3); else if (dir === 3) rotate(1);
+  for (let r=0;r<size;r++) grid[r] = slide(grid[r]);
+  if (dir === 2) rotate(2); else if (dir === 1) rotate(1); else if (dir === 3) rotate(3);
   const after = JSON.stringify(grid);
-  if (before !== after) {
-    addTile();
-    updateBest();
-    draw();
-    if (gameOver()) endGame();
-  }
+  if (before !== after) { addTile(); updateBest(); draw(); if (gameOver()) endGame(); }
 }
-
-function gameOver(){
-  if(randomEmpty()) return false;
-  for(let r=0;r<size;r++)for(let c=0;c<size;c++){
-    const v=grid[r][c];
-    if(r+1<size && grid[r+1][c]===v) return false;
-    if(c+1<size && grid[r][c+1]===v) return false;
-  }
-  return true;
-}
+function gameOver(){ if(randomEmpty()) return false; for(let r=0;r<size;r++)for(let c=0;c<size;c++){const v=grid[r][c]; if(r+1<size&&grid[r+1][c]===v) return false; if(c+1<size&&grid[r][c+1]===v) return false;} return true;}
 function updateBest(){ if(score>best){ best=score; localStorage.setItem('best2048', best); }}
 
-/* ===== Inputs (swipe/mouse) ===== */
 const startPos={x:0,y:0}; let dragging=false;
 function touchStart(e){dragging=true; const t=e.touches?e.touches[0]:e; startPos.x=t.clientX; startPos.y=t.clientY;}
-function touchEnd(e){
-  if(!dragging) return; dragging=false;
-  const t=e.changedTouches?e.changedTouches[0]:e;
-  const dx=t.clientX-startPos.x, dy=t.clientY-startPos.y;
-  if(Math.abs(dx)>Math.abs(dy)){ move(dx>0?2:0); } else { move(dy>0?3:1); }
-}
+function touchEnd(e){ if(!dragging) return; dragging=false; const t=e.changedTouches?e.changedTouches[0]:e; const dx=t.clientX-startPos.x, dy=t.clientY-startPos.y; if(Math.abs(dx)>Math.abs(dy)){ move(dx>0?2:0);} else { move(dy>0?3:1);} }
 gridEl.addEventListener('touchstart',touchStart); gridEl.addEventListener('touchend',touchEnd);
 gridEl.addEventListener('mousedown',touchStart); gridEl.addEventListener('mouseup',touchEnd);
 
-/* ===== Arrow buttons ===== */
 document.getElementById('left').onclick=()=>move(0);
 document.getElementById('up').onclick=()=>move(1);
 document.getElementById('right').onclick=()=>move(2);
 document.getElementById('down').onclick=()=>move(3);
 
-/* ===== Menu: open/close ===== */
-const menuBtn   = document.getElementById('menuBtn');
-const drawer    = document.getElementById('drawer');
-const backdrop  = document.getElementById('backdrop');
-
+const menuBtn=document.getElementById('menuBtn'); const drawer=document.getElementById('drawer'); const backdrop=document.getElementById('backdrop');
 function openDrawer(){ drawer.classList.add('open'); backdrop.classList.add('show'); }
 function closeDrawer(){ drawer.classList.remove('open'); backdrop.classList.remove('show'); }
+menuBtn.addEventListener('click', openDrawer); backdrop.addEventListener('click', closeDrawer);
 
-menuBtn.addEventListener('click', openDrawer);
-backdrop.addEventListener('click', closeDrawer);
+document.getElementById('mNew').onclick=()=>{ closeDrawer(); setup(); };
+document.getElementById('mInvite').onclick=()=>{ closeDrawer(); prompt('Copy link:','https://t.me/Smart2048_bot'); };
+document.getElementById('mShare').onclick=()=>{ closeDrawer(); const text=`I scored ${score} in 2048 Mini!`; if(navigator.share){navigator.share({text});} else {prompt('Copy and share your score:', text);} };
+document.getElementById('mAbout').onclick=()=>{ closeDrawer(); alert('2048 Mini — MVP.'); };
 
-/* ===== Menu actions ===== */
-document.getElementById('mNew').onclick = ()=>{ closeDrawer(); setup(); };
+let AdController=null; if(window.Adsgram&&typeof window.Adsgram.init==="function"){ AdController=window.Adsgram.init({blockId:"int-14155"}); }
+function showInterstitialAd(){ if(!AdController||typeof AdController.show!=="function") return Promise.resolve(); return AdController.show().catch(()=>{}); }
 
-function buildInviteLink(){
-  const link = 'https://t.me/Smart2048_bot'; // نفس اللينك العام (ماغيرتش لوجيك الإحالات)
-  return link;
-}
+let RewardController=null; if(window.Adsgram&&typeof window.Adsgram.init==="function"){ RewardController=window.Adsgram.init({blockId:"14159"}); }
+function showRewardAd(){ if(!RewardController||typeof RewardController.show!=="function"){return Promise.resolve(false);} return RewardController.show().then(res=>true).catch(()=>false); }
 
-document.getElementById('mInvite').onclick = ()=>{
-  closeDrawer();
-  const link = buildInviteLink();
-  const msg = `Come play 2048 Mini! ${link}`;
-  if(navigator.share){ navigator.share({ text: msg, url: link }).catch(()=> prompt('Copy link:', link)); }
-  else{ prompt('Copy link:', link); }
-};
+function reviveBoard(){ const filled=[]; for(let r=0;r<size;r++) for(let c=0;c<size;c++){ if(grid[r][c]!==0) filled.push([r,c]); } if(filled.length){ const [rr,cc]=filled[Math.floor(Math.random()*filled.length)]; grid[rr][cc]=0; } updateBest(); }
 
-document.getElementById('mShare').onclick = ()=>{
-  closeDrawer();
-  const text=`I scored ${score} in 2048 Mini!`;
-  if(navigator.share){navigator.share({text});}
-  else {prompt('Copy and share your score:', text);}
-};
+function endGame(){ if(!continuedOnce&&RewardController){ const wantContinue=confirm("Game over! Your score: "+score+"\n\nWatch an ad to continue?"); if(wantContinue){ showRewardAd().then(ok=>{ if(ok){ continuedOnce=true; reviveBoard(); draw(); } else { showInterstitialAd().finally(()=>alert("Game ended! Final score: "+score)); } }); return; } else { showInterstitialAd().finally(()=>alert("Game ended! Final score: "+score)); return; } } showInterstitialAd().finally(()=>alert("Game ended! Final score: "+score)); }
 
-document.getElementById('mAbout').onclick = ()=>{
-  closeDrawer();
-  alert('2048 Mini — MVP.');
-};
-
-/* ===== AdsGram: init + end game ad ===== */
-let AdController = null;
-if (window.Adsgram && typeof window.Adsgram.init === "function") {
-  AdController = window.Adsgram.init({ blockId: "int-14155" });
-}
-function showInterstitialAd(){
-  if (!AdController || typeof AdController.show !== "function") return Promise.resolve();
-  return AdController.show().catch(()=>{});
-}
-
-/* ===== AdsGram: Reward setup ===== */
-let RewardController = null;
-if (window.Adsgram && typeof window.Adsgram.init === "function") {
-  RewardController = window.Adsgram.init({ blockId: "14159" });
-}
-function showRewardAd(){
-  if (!RewardController || typeof RewardController.show !== "function") {
-    return Promise.resolve(false);
-  }
-  return RewardController.show()
-    .then(res => true)
-    .catch(()=> false);
-}
-
-/* ✅ reviveBoard */
-function reviveBoard(){
-  const filled=[];
-  for(let r=0;r<size;r++) for(let c=0;c<size;c++){
-    if(grid[r][c]!==0) filled.push([r,c]);
-  }
-  if(filled.length){
-    const [rr,cc]=filled[Math.floor(Math.random()*filled.length)];
-    grid[rr][cc]=0;
-  }
-  updateBest();
-}
-
-/* ✅ endGame */
-function endGame(){
-  if (!continuedOnce && RewardController) {
-    const wantContinue = confirm("Game over! Your score: " + score + "\n\nWatch an ad to continue?");
-    if (wantContinue) {
-      showRewardAd().then(ok=>{
-        if (ok){
-          continuedOnce = true;
-          reviveBoard();
-          draw();
-        }else{
-          showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
-        }
-      });
-      return;
-    } else {
-      showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
-      return;
-    }
-  }
-  showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
-}
-
-/* ===== Start ===== */
 setup();
 </script>
 </body>
