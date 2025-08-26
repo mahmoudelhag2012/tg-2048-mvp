@@ -31,9 +31,7 @@
         } else if (telegaAds && typeof telegaAds.show === "function") {
           return telegaAds.show();
         }
-      } catch(e) {
-        console.warn("Telega show error:", e);
-      }
+      } catch(e) { console.warn("Telega show error:", e); }
       return Promise.resolve();
     }
   </script>
@@ -58,45 +56,47 @@
     .grid{background:var(--board);border-radius:12px;padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;touch-action:none}
     .cell{height:80px;background:var(--tile);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px}
 
-    .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;justify-items:center;align-items:center}
-    .controls .spacer{height:0}
+    /* أزرار عامة بدون إجبار أحجام */
     button{
       padding:10px 12px;border:0;border-radius:12px;font-weight:700;background:var(--btn);color:var(--white);cursor:pointer;
-      min-width:90px;min-height:60px;font-size:20px;
     }
-    .arrow{font-size:22px}
 
-    small{opacity:.7}
+    /* أزرار الاتجاهات فقط */
+    .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;justify-items:center;align-items:center}
+    .controls .spacer{height:0}
+    .arrow{min-width:96px;min-height:66px;font-size:20px}
 
-    /* زرار المنيو صغير جدا */
+    /* زرار المنيو الصغير */
     .menuBtn{
       position:absolute; top:8px; right:8px;
-      background:var(--btn); color:#fff;
-      border:0; border-radius:6px;
-      width:34px; height:34px;
-      font-size:18px; font-weight:bold;
+      width:32px; height:32px; padding:0;
+      min-width:0; min-height:0; line-height:1;
+      background:transparent; color:var(--btn);
+      border:2px solid var(--btn); border-radius:8px;
       display:flex; align-items:center; justify-content:center;
-      cursor:pointer;
+      font-size:18px; font-weight:900; z-index:11;
     }
 
+    /* الـ Drawer */
     .backdrop{position:fixed; inset:0; background:#0007; display:none;}
     .backdrop.show{ display:block; }
 
     .drawer{
       position:fixed; top:0; right:0; height:100dvh; width:220px;
       background:#f5efe6; box-shadow:0 0 30px #0003; padding:16px 14px;
-      transform: translateX(100%); transition: transform .25s ease; z-index:10;
+      transform: translateX(100%); transition: transform .25s ease; z-index:12;
     }
     .drawer.open{ transform: translateX(0); }
-
     .drawer h3{margin:4px 0 12px}
-    .drawer .menuItem{display:block;width:100%;margin:8px 0;padding:12px 14px;background:var(--btn);color:#fff;border:0;border-radius:12px;font-weight:700;cursor:pointer}
+    .menuItem{display:block;width:100%;margin:8px 0;padding:12px 14px;background:var(--btn);color:#fff;border:0;border-radius:12px;font-weight:700;cursor:pointer}
+
+    small{opacity:.7}
   </style>
 </head>
 <body>
 <div class="wrap">
   <h1>2048 Mini</h1>
-  <button id="menuBtn" class="menuBtn">☰</button>
+  <button id="menuBtn" class="menuBtn" aria-label="Menu">☰</button>
 
   <div class="top">
     <div class="card">Score<br><b id="score">0</b></div>
@@ -118,6 +118,7 @@
   <p><small>Swipe on the board or use the arrows. MVP build.</small></p>
 </div>
 
+<!-- Drawer -->
 <div id="backdrop" class="backdrop"></div>
 <div id="drawer" class="drawer">
   <h3>Menu</h3>
@@ -128,11 +129,14 @@
 </div>
 
 <script>
+/* ===== Telegram ===== */
 const tg = window.Telegram?.WebApp; if (tg) tg.expand();
 
+/* ===== Game State ===== */
 const size=4; let grid=[], score=0, best=+localStorage.getItem('best2048')||0;
 const gridEl=document.getElementById('grid'); const scoreEl=document.getElementById('score'); const bestEl=document.getElementById('best');
 
+/* Flags */
 let continuedOnce = false;
 let shown1024Ad = false;
 let shown2048Ad = false;
@@ -175,6 +179,7 @@ function rotate(times){
   }
 }
 
+/* Directions */
 function move(dir){
   const before = JSON.stringify(grid);
   if (dir === 2) rotate(2); else if (dir === 1) rotate(3); else if (dir === 3) rotate(1);
@@ -183,12 +188,27 @@ function move(dir){
   const after = JSON.stringify(grid);
   if (before !== after) { addTile(); updateBest(); draw(); if (gameOver()) endGame(); }
 }
-function gameOver(){ if(randomEmpty()) return false; for(let r=0;r<size;r++)for(let c=0;c<size;c++){const v=grid[r][c]; if(r+1<size&&grid[r+1][c]===v) return false; if(c+1<size&&grid[r][c+1]===v) return false;} return true;}
+
+function gameOver(){
+  if(randomEmpty()) return false;
+  for(let r=0;r<size;r++)for(let c=0;c<size;c++){
+    const v=grid[r][c];
+    if(r+1<size && grid[r+1][c]===v) return false;
+    if(c+1<size && grid[r][c+1]===v) return false;
+  }
+  return true;
+}
 function updateBest(){ if(score>best){ best=score; localStorage.setItem('best2048', best); }}
 
+/* Inputs */
 const startPos={x:0,y:0}; let dragging=false;
 function touchStart(e){dragging=true; const t=e.touches?e.touches[0]:e; startPos.x=t.clientX; startPos.y=t.clientY;}
-function touchEnd(e){ if(!dragging) return; dragging=false; const t=e.changedTouches?e.changedTouches[0]:e; const dx=t.clientX-startPos.x, dy=t.clientY-startPos.y; if(Math.abs(dx)>Math.abs(dy)){ move(dx>0?2:0);} else { move(dy>0?3:1);} }
+function touchEnd(e){
+  if(!dragging) return; dragging=false;
+  const t=e.changedTouches?e.changedTouches[0]:e;
+  const dx=t.clientX-startPos.x, dy=t.clientY-startPos.y;
+  if(Math.abs(dx)>Math.abs(dy)){ move(dx>0?2:0); } else { move(dy>0?3:1); }
+}
 gridEl.addEventListener('touchstart',touchStart); gridEl.addEventListener('touchend',touchEnd);
 gridEl.addEventListener('mousedown',touchStart); gridEl.addEventListener('mouseup',touchEnd);
 
@@ -197,26 +217,54 @@ document.getElementById('up').onclick=()=>move(1);
 document.getElementById('right').onclick=()=>move(2);
 document.getElementById('down').onclick=()=>move(3);
 
-const menuBtn=document.getElementById('menuBtn'); const drawer=document.getElementById('drawer'); const backdrop=document.getElementById('backdrop');
+/* Drawer control */
+const menuBtn=document.getElementById('menuBtn');
+const drawer=document.getElementById('drawer');
+const backdrop=document.getElementById('backdrop');
 function openDrawer(){ drawer.classList.add('open'); backdrop.classList.add('show'); }
 function closeDrawer(){ drawer.classList.remove('open'); backdrop.classList.remove('show'); }
-menuBtn.addEventListener('click', openDrawer); backdrop.addEventListener('click', closeDrawer);
+menuBtn.addEventListener('click', openDrawer);
+backdrop.addEventListener('click', closeDrawer);
 
 document.getElementById('mNew').onclick=()=>{ closeDrawer(); setup(); };
 document.getElementById('mInvite').onclick=()=>{ closeDrawer(); prompt('Copy link:','https://t.me/Smart2048_bot'); };
 document.getElementById('mShare').onclick=()=>{ closeDrawer(); const text=`I scored ${score} in 2048 Mini!`; if(navigator.share){navigator.share({text});} else {prompt('Copy and share your score:', text);} };
 document.getElementById('mAbout').onclick=()=>{ closeDrawer(); alert('2048 Mini — MVP.'); };
 
-let AdController=null; if(window.Adsgram&&typeof window.Adsgram.init==="function"){ AdController=window.Adsgram.init({blockId:"int-14155"}); }
+/* AdsGram */
+let AdController=null;
+if(window.Adsgram&&typeof window.Adsgram.init==="function"){ AdController=window.Adsgram.init({blockId:"int-14155"}); }
 function showInterstitialAd(){ if(!AdController||typeof AdController.show!=="function") return Promise.resolve(); return AdController.show().catch(()=>{}); }
 
-let RewardController=null; if(window.Adsgram&&typeof window.Adsgram.init==="function"){ RewardController=window.Adsgram.init({blockId:"14159"}); }
-function showRewardAd(){ if(!RewardController||typeof RewardController.show!=="function"){return Promise.resolve(false);} return RewardController.show().then(res=>true).catch(()=>false); }
+let RewardController=null;
+if(window.Adsgram&&typeof window.Adsgram.init==="function"){ RewardController=window.Adsgram.init({blockId:"14159"}); }
+function showRewardAd(){ if(!RewardController||typeof RewardController.show!=="function"){return Promise.resolve(false);} return RewardController.show().then(()=>true).catch(()=>false); }
 
-function reviveBoard(){ const filled=[]; for(let r=0;r<size;r++) for(let c=0;c<size;c++){ if(grid[r][c]!==0) filled.push([r,c]); } if(filled.length){ const [rr,cc]=filled[Math.floor(Math.random()*filled.length)]; grid[rr][cc]=0; } updateBest(); }
+/* Revive + end */
+function reviveBoard(){
+  const filled=[];
+  for(let r=0;r<size;r++) for(let c=0;c<size;c++){ if(grid[r][c]!==0) filled.push([r,c]); }
+  if(filled.length){ const [rr,cc]=filled[Math.floor(Math.random()*filled.length)]; grid[rr][cc]=0; }
+  updateBest();
+}
+function endGame(){
+  if(!continuedOnce&&RewardController){
+    const wantContinue=confirm("Game over! Your score: "+score+"\n\nWatch an ad to continue?");
+    if (wantContinue){
+      showRewardAd().then(ok=>{
+        if(ok){ continuedOnce=true; reviveBoard(); draw(); }
+        else { showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score)); }
+      });
+      return;
+    } else {
+      showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
+      return;
+    }
+  }
+  showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
+}
 
-function endGame(){ if(!continuedOnce&&RewardController){ const wantContinue=confirm("Game over! Your score: "+score+"\n\nWatch an ad to continue?"); if(wantContinue){ showRewardAd().then(ok=>{ if(ok){ continuedOnce=true; reviveBoard(); draw(); } else { showInterstitialAd().finally(()=>alert("Game ended! Final score: "+score)); } }); return; } else { showInterstitialAd().finally(()=>alert("Game ended! Final score: "+score)); return; } } showInterstitialAd().finally(()=>alert("Game ended! Final score: "+score)); }
-
+/* Start */
 setup();
 </script>
 </body>
