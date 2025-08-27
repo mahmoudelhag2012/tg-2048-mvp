@@ -336,7 +336,10 @@ backdrop.addEventListener('click', closeDrawer);
 document.getElementById('mNew').onclick=()=>{ closeDrawer(); setup(); };
 document.getElementById('mInvite').onclick=()=>{ closeDrawer(); prompt('Copy link:','https://t.me/Smart2048_bot'); };
 document.getElementById('mShare').onclick=()=>{ closeDrawer(); const text=`I scored ${score} in 2048 Mini!`; if(navigator.share){navigator.share({text});} else {prompt('Copy and share your score:', text);} };
-document.getElementById('mAbout').onclick=()=>{ closeDrawer(); alert('2048 Mini — MVP.'); };
+document.getElementById('mAbout').onclick=()=>{ 
+  closeDrawer(); 
+  alert("📌 عن اللعبة\nلعبة Smart 2048 Mini هي نسخة مطوّرة من لعبة 2048 الكلاسيكية. كل ما توصل مايلستون (256 / 512 / 1024 / 2048) تقدر تشاهد إعلان وتاخد مكافآت بالدولار (USDT).\n\n💰 طرق الدفع:\n- داخل مصر: جميع المحافظ الإلكترونية (Vodafone Cash – Orange Cash – Etisalat Cash – WE Pay) + InstaPay + Binance (كود 'Red Packet').\n- خارج مصر: Binance (كود 'Binance Red Packet')."); 
+};
 
 /* Revive + end (مع ربط extraLives تلقائيًا) */
 function reviveBoard(){
