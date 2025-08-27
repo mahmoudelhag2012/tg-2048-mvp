@@ -153,8 +153,14 @@ function setBalance(v){
 function updateBalanceUI(){ balanceEl.textContent = (+localStorage.getItem('usdBalance')||0).toFixed(4); }
 updateBalanceUI();
 
-/* Extra lives (نعدّها هنا، من غير ربطها بالـendGame لسه) */
-let extraLives = 0;
+/* ========= Extra Lives (تخزين دائم + استهلاك تلقائي) ========= */
+function getExtraLives(){ return +(localStorage.getItem('extraLives')||'0'); }
+function setExtraLives(v){
+  const n = Math.max(0, v|0);
+  localStorage.setItem('extraLives', String(n));
+  extraLives = n;
+}
+let extraLives = getExtraLives(); // نحافظ عليها بين الجولات
 
 /* مكافآت الأساس */
 const baseRewards = {
@@ -213,9 +219,9 @@ function tryAwardMilestone(ms){
     const newBal = getBalance() + amount;
     setBalance(newBal);
 
-    // Extra life عند 512 و 2048
+    // ✅ Extra life عند 512 و 2048 (تتخزن دائمًا)
     if (ms === 512 || ms === 2048) {
-      extraLives += 1;
+      setExtraLives(getExtraLives() + 1);
     }
 
     // إشعار بسيط
@@ -332,7 +338,7 @@ document.getElementById('mInvite').onclick=()=>{ closeDrawer(); prompt('Copy lin
 document.getElementById('mShare').onclick=()=>{ closeDrawer(); const text=`I scored ${score} in 2048 Mini!`; if(navigator.share){navigator.share({text});} else {prompt('Copy and share your score:', text);} };
 document.getElementById('mAbout').onclick=()=>{ closeDrawer(); alert('2048 Mini — MVP.'); };
 
-/* Revive + end (بدون ربط extraLives حالياً) */
+/* Revive + end (مع ربط extraLives تلقائيًا) */
 function reviveBoard(){
   const filled=[];
   for(let r=0;r<size;r++) for(let c=0;c<size;c++){ if(grid[r][c]!==0) filled.push([r,c]); }
@@ -340,6 +346,15 @@ function reviveBoard(){
   updateBest();
 }
 function endGame(){
+  // ✅ لو عندك Extra Life اتصرف تلقائيًا أولًا بدون أي إعلان
+  if (getExtraLives() > 0) {
+    setExtraLives(getExtraLives() - 1);  // استهلاك لايف واحد
+    reviveBoard();
+    draw();
+    alert('🔥 Extra Life used! You are back in the game.');
+    return;
+  }
+
   if(!continuedOnce&&RewardController){
     const wantContinue=confirm("Game over! Your score: "+score+"\n\nWatch an ad to continue?");
     if (wantContinue){
@@ -359,7 +374,7 @@ function endGame(){
 /* Start */
 setup();
 
-/* Drawer wiring (موجودة فوق، بس هنا بعد DOM جاهز) */
+/* (وجود هذه السطور كما هي لا يغيّر شيء) */
 document.getElementById('mNew');
 document.getElementById('mInvite');
 document.getElementById('mShare');
