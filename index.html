@@ -197,7 +197,6 @@ function setExtraLives(v){
 }
 
 /* Rewards */
-let extraLives=0;
 const baseRewards={256:0.0002,512:0.0003,1024:0.0015,2048:0.002};
 let msRunCount={256:0,512:0,1024:0,2048:0};
 let msSeenTilesInRun={256:0,512:0,1024:0,2048:0};
@@ -222,7 +221,10 @@ function offerAndMaybeAward(ms,tier){
   showRewardAd().then(ok=>{
     if(!ok) return;
     setBalance(getBalance()+amount);
-    if(ms===512||ms===2048) extraLives+=1;
+   if (ms === 512 || ms === 2048) {
+  setExtraLives(getExtraLives() + 1);   // تخزين دائم
+}
+
     alert(`✅ Reward added: $${amount.toFixed(4)}${(ms===512||ms===2048)?' + Extra Life':''}`);
   });
 }
