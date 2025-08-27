@@ -159,6 +159,12 @@ function getBalance(){ return +(localStorage.getItem('usdBalance')||'0'); }
 function setBalance(v){ const fixed=Math.max(0,v); localStorage.setItem('usdBalance',fixed.toFixed(4)); updateBalanceUI(); }
 function updateBalanceUI(){ balanceEl.textContent=(+localStorage.getItem('usdBalance')||0).toFixed(4); }
 updateBalanceUI();
+/* ========= Extra Lives (تخزين دائم + قراءة) ========= */
+function getExtraLives(){ return +(localStorage.getItem('extraLives') || '0'); }
+function setExtraLives(v){
+  v = Math.max(0, v|0);
+  localStorage.setItem('extraLives', String(v));
+}
 
 /* Rewards */
 let extraLives=0;
@@ -264,6 +270,16 @@ document.getElementById('mAbout').onclick=()=>{ closeDrawer(); alert('2048 Mini 
 
 function reviveBoard(){ const filled=[]; for(let r=0;r<size;r++) for(let c=0;c<size;c++){ if(grid[r][c]!==0) filled.push([r,c]); } if(filled.length){ const [rr,cc]=filled[Math.floor(Math.random()*filled.length)]; grid[rr][cc]=0; } updateBest(); }
 function endGame(){
+  // ✅ استخدم Extra Life تلقائيًا قبل أي إعلان
+const lives = getExtraLives();
+if (lives > 0) {
+  setExtraLives(lives - 1);     // استهلاك لايف واحد
+  reviveBoard();                // رجّع حركة
+  draw();
+  alert('🔥 Extra Life used! You are back in the game.');
+  return;                       // نرجع للعبة وممنسألش عن إعلان
+}
+
   if(!continuedOnce){
     const wantContinue=confirm("Game over! Your score: "+score+"\n\nWatch an ad to continue?");
     if(wantContinue){
