@@ -159,6 +159,36 @@ function getBalance(){ return +(localStorage.getItem('usdBalance')||'0'); }
 function setBalance(v){ const fixed=Math.max(0,v); localStorage.setItem('usdBalance',fixed.toFixed(4)); updateBalanceUI(); }
 function updateBalanceUI(){ balanceEl.textContent=(+localStorage.getItem('usdBalance')||0).toFixed(4); }
 updateBalanceUI();
+
+/* ====== Daily Bonus via Interstitial (مرّة يوميًا) ====== */
+const DAILY_BONUS_AMOUNT = 0.0001;      // مبلغ صغير جدًا
+const DAILY_BONUS_KEY    = 'dailyBonusDate';
+let   dailyBonusPrompted = false;       // عشان ما نكرر الرسالة في نفس الجلسة
+
+function _todayKey(){
+  const d = new Date();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+function hasClaimedDailyBonusToday(){
+  return localStorage.getItem(DAILY_BONUS_KEY) === _todayKey();
+}
+function markDailyBonusClaimed(){
+  localStorage.setItem(DAILY_BONUS_KEY, _todayKey());
+}
+function maybeOfferDailyBonusInt(){
+  if (hasClaimedDailyBonusToday() || dailyBonusPrompted) return;
+  dailyBonusPrompted = true;
+  const ok = confirm(`🎁 Daily Bonus\nاحصل على $${DAILY_BONUS_AMOUNT.toFixed(4)} بعد مشاهدة إعلان.`);
+  if (!ok) return;
+  showInterstitialAd().then(()=>{
+    setBalance(getBalance() + DAILY_BONUS_AMOUNT);
+    markDailyBonusClaimed();
+    alert(`✅ Bonus added: $${DAILY_BONUS_AMOUNT.toFixed(4)}`);
+  }).catch(()=>{ alert('لم يتم عرض الإعلان. جرّب لاحقًا.'); });
+}
+
 /* ========= Extra Lives (تخزين دائم + قراءة) ========= */
 function getExtraLives(){ return +(localStorage.getItem('extraLives') || '0'); }
 function setExtraLives(v){
@@ -294,7 +324,12 @@ if (lives > 0) {
 }
 
 /* ابدأ اللعبة بعد ما الصفحة تجهز */
-window.addEventListener('load', setup);
+/* ابدأ اللعبة + عرض Daily Bonus */
+window.addEventListener('load', () => {
+  setup();
+  setTimeout(maybeOfferDailyBonusInt, 1500); // بعد ثانية ونص من بداية اللعبة
+});
+
 </script>
 </body>
 </html>
