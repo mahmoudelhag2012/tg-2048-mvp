@@ -97,6 +97,7 @@
 <div id="drawer" class="drawer">
   <h3>Menu</h3>
   <div class="menuInfo">Balance (USDT): <span id="balance" class="mono">0.0000</span></div>
+  <div class="menuInfo">Extra Lives: <span id="lives" class="mono">0</span></div>
   <button id="mNew" class="menuItem">New Game</button>
   <button id="mInvite" class="menuItem">Invite Friend</button>
   <button id="mShare" class="menuItem">Share</button>
@@ -190,10 +191,18 @@ function maybeOfferDailyBonusInt(){
 }
 
 /* ========= Extra Lives (تخزين دائم + قراءة) ========= */
-function getExtraLives(){ return +(localStorage.getItem('extraLives') || '0'); }
+function getExtraLives(){ 
+  return +(localStorage.getItem('extraLives') || '0'); 
+}
+
 function setExtraLives(v){
   v = Math.max(0, v|0);
   localStorage.setItem('extraLives', String(v));
+  updateLivesUI();   // تحديث العرض في المنيو
+}
+
+function updateLivesUI(){ 
+  document.getElementById('lives').textContent = getExtraLives();
 }
 
 /* Rewards */
