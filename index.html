@@ -102,6 +102,11 @@
   <button id="mInvite" class="menuItem">Invite Friend</button>
   <button id="mShare" class="menuItem">Share</button>
   <button id="mAbout" class="menuItem">About</button>
+
+  <!-- زر Claim -->
+  <button id="mClaim" class="menuItem" style="display:none">Claim</button>
+</div>
+
 </div>
 
 <script>
@@ -158,8 +163,39 @@ const gridEl=document.getElementById('grid'); const scoreEl=document.getElementB
 const balanceEl = document.getElementById('balance');
 function getBalance(){ return +(localStorage.getItem('usdBalance')||'0'); }
 function setBalance(v){ const fixed=Math.max(0,v); localStorage.setItem('usdBalance',fixed.toFixed(4)); updateBalanceUI(); }
-function updateBalanceUI(){ balanceEl.textContent=(+localStorage.getItem('usdBalance')||0).toFixed(4); }
+function updateBalanceUI(){ 
+  const bal = (+localStorage.getItem('usdBalance')||0).toFixed(4);
+  balanceEl.textContent = bal;
+
+  // إظهار زر Claim لو الرصيد >= 1
+  const claimBtn = document.getElementById('mClaim');
+  if(+bal >= 1){
+    claimBtn.style.display = 'block';
+  } else {
+    claimBtn.style.display = 'none';
+  }
+}
 updateBalanceUI();
+
+// حدث الضغط على زر Claim
+document.getElementById('mClaim').onclick = () => {
+  const amount = (+localStorage.getItem('usdBalance')||0).toFixed(4);
+  const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'unknown';
+  const username = window.Telegram?.WebApp?.initDataUnsafe?.user?.username || 'unknown';
+
+  // إرسال طلب للبوت
+  fetch("https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: "603092693", // ID بتاعك
+      text: `طلب سحب ✅\nUser: @${username} (${userId})\nBalance: $${amount}`
+    })
+  }).then(()=> alert("✅ تم إرسال طلب السحب للبوت"))
+    .catch(()=> alert("❌ حصل خطأ، جرّب تاني"));
+};
+
+
 
 /* ====== Daily Bonus via Interstitial (مرّة يوميًا) ====== */
 const DAILY_BONUS_AMOUNT = 0.0001;      // مبلغ صغير جدًا
