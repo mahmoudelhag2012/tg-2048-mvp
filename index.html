@@ -191,8 +191,17 @@ document.getElementById('mClaim').onclick = () => {
       chat_id: "603092693", // ID بتاعك
       text: `طلب سحب ✅\nUser: @${username} (${userId})\nBalance: $${amount}`
     })
-  }).then(()=> alert("✅ تم إرسال طلب السحب للبوت"))
-    .catch(()=> alert("❌ حصل خطأ، جرّب تاني"));
+  }).then(()=> {
+  alert("✅ تم إرسال طلب السحب للبوت");
+  // تصفير الرصيد
+  localStorage.setItem('usdBalance','0.0000');
+  updateBalanceUI();
+  // إخفاء زر Claim
+  document.getElementById('mClaim').style.display = 'none';
+})
+.catch(()=> alert("❌ حصل خطأ، جرّب تاني"));
+
+
 };
 
 
