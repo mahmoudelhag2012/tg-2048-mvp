@@ -260,8 +260,8 @@ let reached2048InRun=false;
 let AdController=null, RewardController=null;
 try{
   if(window.Adsgram&&typeof window.Adsgram.init==="function"){
-    AdController=window.Adsgram.init({blockId:"int-14155"});
-    RewardController=window.Adsgram.init({blockId:"14159"});
+    AdController=window.Adsgram.init({blockId:"int-14519"});
+    RewardController=window.Adsgram.init({blockId:"14520"});
   }
 }catch(_){}
 function showInterstitialAd(){ try{ if(!AdController||typeof AdController.show!=="function")return Promise.resolve(); return AdController.show().catch(()=>{});}catch(_){return Promise.resolve();} }
