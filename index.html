@@ -7,6 +7,8 @@
 
   <!-- Telegram Mini App SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- AdsGram SDK -->
+  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
   <!-- Telega.io SDK -->
   <script src="https://inapp.telega.io/sdk/v1/sdk.js"></script>
 
@@ -39,7 +41,7 @@
     .splash{
       position:fixed;inset:0;z-index:1000;
       background:radial-gradient(120% 120% at 50% -20%,#fdf7ea 0%,#efe6d9 45%,#e7dccf 100%);
-      display:none;
+      display:none; /* 🔒 مقفولة افتراضيًا كـ Hotfix */
       align-items:center;justify-content:center;
       transition:opacity .35s ease,visibility .35s ease;
     }
@@ -57,7 +59,7 @@
 </head>
 <body>
 
-<!-- Splash -->
+<!-- Splash (مقفول افتراضيًا؛ نفعّله فقط لو الصورة جاهزة) -->
 <div id="splash" class="splash">
   <div class="splash-card" id="splashCard">
     <img id="splashImg" class="splash-logo" alt="Earn USDT — 2048 Mini">
@@ -108,105 +110,48 @@
 </div>
 
 <script>
-/* ===== Error guard ===== */
+/* ===== حارس أخطاء عام ما يوقفش الصفحة ===== */
 window.addEventListener('error', e => { try{ console.warn(e.message); }catch(_){} });
 
 /* ===== Telegram ===== */
 try{ const tg = window.Telegram?.WebApp; if (tg) tg.expand(); }catch(_){}
 
-/* ===== Telega (SDK & helpers) ===== */
-<script>
-// ===== Telega setup (robust) =====
-let telegaReady = false;
-let telegaAds = null;
-
-// بدّل القيمة لو توكنك مختلف
-const TELEG_TOKEN = 'a14e3947-839f-4b2a-aee0-5a3b1412c818';
-
-// UUIDs من لوحة Telega
-const TELEG_UID_1024 = '3a1f1a7a-028c-4909-b20b-f4733d02fcc5'; // milestone
-const TELEG_UID_2048 = '6a5cb9ac-15d0-4da2-bbca-916236f1bc83'; // milestone
-
-// حط هنا UUID البلوك الحقيقي للـInterstitial/Reward (لو لسه معملتش، سيبه مؤقتًا)
-const TELEG_UID_INTERSTITIAL = TELEG_UID_1024; // TODO: غيّره لبلوك interstitial
-const TELEG_UID_REWARD       = TELEG_UID_2048; // TODO: غيّره لبلوك rewarded
-
-// نضمن إن Telegram WebApp جاهز
-try { const tg = window.Telegram?.WebApp; if (tg){ tg.ready?.(); tg.expand?.(); } } catch(_){}
-
-function waitForTelegaSDK(timeoutMs = 4000){
-  return new Promise(resolve=>{
-    const start = Date.now();
-    (function tick(){
-      if (window.TelegaIn && window.TelegaIn.AdsController && window.ads) return resolve(true);
-      if (Date.now() - start > timeoutMs) return resolve(false);
-      requestAnimationFrame(tick);
-    })();
-  });
-}
-
-async function ensureTelega(){
-  if (telegaReady && telegaAds) return true;
-
-  const ok = await waitForTelegaSDK();
-  if (!ok) { console.warn('Telega SDK لم يجهز'); return false; }
-
-  try{
-    if (!telegaAds){
-      telegaAds = window.TelegaIn.AdsController.create_miniapp({ token: TELEG_TOKEN });
-    }
-    telegaReady = true;
-    return true;
-  }catch(e){
-    console.warn('Telega init error:', e);
-    return false;
+/* ===== Telega helpers (محاطة بـ try) ===== */
+let telegaAds=null;
+try{
+  if (window.TelegaIn && window.TelegaIn.AdsController) {
+    telegaAds = window.TelegaIn.AdsController.create_miniapp({
+      token: 'a14e3947-839f-4b2a-aee0-5a3b1412c818'
+    });
   }
-}
-
-// دالة عامة لعرض أي بلوك Telega بالـUUID
-async function showTelega(adUuid){
-  const ok = await ensureTelega();
-  if (!ok) return Promise.reject(new Error('SDK not ready'));
-
+}catch(_){}
+const TELEG_UID_1024="3a1f1a7a-028c-4909-b20b-f4733d02fcc5";
+const TELEG_UID_2048="6a5cb9ac-15d0-4da2-bbca-916236f1bc83";
+function showTelega(uid){
   try{
-    if (window.ads && typeof window.ads.ad_show === 'function'){
-      return window.ads.ad_show({ adBlockUuid: adUuid });
-    }
-    // fallback أخير
-    if (telegaAds && typeof telegaAds.show === 'function'){
-      return telegaAds.show();
-    }
-  }catch(e){
-    console.warn('Telega show error:', e);
-    return Promise.reject(e);
-  }
-  return Promise.reject(new Error('No show method'));
+    if (window.ads && typeof window.ads.ad_show==="function") return window.ads.ad_show({adBlockUuid:uid});
+    if (telegaAds && typeof telegaAds.show==="function") return telegaAds.show();
+  }catch(e){console.warn("Telega show error:",e)}
+  return Promise.resolve();
 }
-
-// استبدال كامل لـ interstitial/reward بعرض Telega
-function showInterstitialAd(){
-  return showTelega(TELEG_UID_INTERSTITIAL);
-}
-function showRewardAd(){
-  // نعتبر النجاح true لو ما رجعش Error
-  return new Promise(resolve=>{
-    showTelega(TELEG_UID_REWARD).then(()=>resolve(true)).catch(()=>resolve(false));
-  });
-}
-</script>
-
 
 /* ===== Splash ===== */
 const SPLASH_IMG_URL = "https://raw.githubusercontent.com/mahmoudelhag2012/tg-2048-mvp/main/splash-usdt-2048.png";
 const splash = document.getElementById('splash');
 const splashImg = document.getElementById('splashImg');
 
-function hideSplash(){ splash.classList.add('hide'); setTimeout(()=> splash.style.display='none', 400); }
-function showSplash(){ splash.classList.remove('hide'); splash.classList.add('show'); }
+function hideSplash(){
+  splash.classList.add('hide');
+  setTimeout(()=> splash.style.display='none', 400);
+}
+function showSplash(){
+  splash.classList.remove('hide');
+  splash.classList.add('show');
+}
 try{
   splashImg.src = SPLASH_IMG_URL;
   splashImg.onload = ()=>{ showSplash(); setTimeout(hideSplash, 2200); };
-  splashImg.onerror = ()=>{ hideSplash(); };
+  splashImg.onerror = ()=>{ /* لو الصورة فشلت، كمّل اللعب عادي */ hideSplash(); };
   splash.addEventListener('click', hideSplash);
 }catch(_){ hideSplash(); }
 
@@ -218,37 +163,53 @@ const gridEl=document.getElementById('grid'); const scoreEl=document.getElementB
 const balanceEl = document.getElementById('balance');
 function getBalance(){ return +(localStorage.getItem('usdBalance')||'0'); }
 function setBalance(v){ const fixed=Math.max(0,v); localStorage.setItem('usdBalance',fixed.toFixed(4)); updateBalanceUI(); }
-function updateBalanceUI(){
+function updateBalanceUI(){ 
   const bal = (+localStorage.getItem('usdBalance')||0).toFixed(4);
   balanceEl.textContent = bal;
+
+  // إظهار زر Claim لو الرصيد >= 1
   const claimBtn = document.getElementById('mClaim');
-  if(+bal >= 1){ claimBtn.style.display = 'block'; } else { claimBtn.style.display = 'none'; }
+  if(+bal >= 1){
+    claimBtn.style.display = 'block';
+  } else {
+    claimBtn.style.display = 'none';
+  }
 }
 updateBalanceUI();
 
+// حدث الضغط على زر Claim
 document.getElementById('mClaim').onclick = () => {
   const amount = (+localStorage.getItem('usdBalance')||0).toFixed(4);
   const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'unknown';
   const username = window.Telegram?.WebApp?.initDataUnsafe?.user?.username || 'unknown';
+
+  // إرسال طلب للبوت
   fetch("https://api.telegram.org/bot8173990075:AAFRvQLYjTFISspmepGXISVSQEu_ykPcBWg/sendMessage", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      chat_id: "603092693",
+      chat_id: "603092693", // ID بتاعك
       text: `طلب سحب ✅\nUser: @${username} (${userId})\nBalance: $${amount}`
     })
-  }).then(()=>{
-    alert("✅ تم إرسال طلب السحب للبوت");
-    localStorage.setItem('usdBalance','0.0000');
-    updateBalanceUI();
-    document.getElementById('mClaim').style.display = 'none';
-  }).catch(()=> alert("❌ حصل خطأ، جرّب تاني"));
+  }).then(()=> {
+  alert("✅ تم إرسال طلب السحب للبوت");
+  // تصفير الرصيد
+  localStorage.setItem('usdBalance','0.0000');
+  updateBalanceUI();
+  // إخفاء زر Claim
+  document.getElementById('mClaim').style.display = 'none';
+})
+.catch(()=> alert("❌ حصل خطأ، جرّب تاني"));
+
+
 };
 
-/* ====== Daily Bonus via Interstitial (Telega) ====== */
-const DAILY_BONUS_AMOUNT = 0.0001;
+
+
+/* ====== Daily Bonus via Interstitial (مرّة يوميًا) ====== */
+const DAILY_BONUS_AMOUNT = 0.0001;      // مبلغ صغير جدًا
 const DAILY_BONUS_KEY    = 'dailyBonusDate';
-let   dailyBonusPrompted = false;
+let   dailyBonusPrompted = false;       // عشان ما نكرر الرسالة في نفس الجلسة
 
 function _todayKey(){
   const d = new Date();
@@ -256,20 +217,12 @@ function _todayKey(){
   const dd = String(d.getDate()).padStart(2,'0');
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
-function hasClaimedDailyBonusToday(){ return localStorage.getItem(DAILY_BONUS_KEY) === _todayKey(); }
-function markDailyBonusClaimed(){ localStorage.setItem(DAILY_BONUS_KEY, _todayKey()); }
-
-function showInterstitialAd(){
-  // استبدال كامل بـ Telega
-  return showTelega(TELEG_UID_INTERSTITIAL);
+function hasClaimedDailyBonusToday(){
+  return localStorage.getItem(DAILY_BONUS_KEY) === _todayKey();
 }
-function showRewardAd(){
-  // استبدال كامل بـ Telega: نعتبر النجاح = Promise resolved
-  return new Promise(resolve=>{
-    showTelega(TELEG_UID_REWARD).then(()=>resolve(true)).catch(()=>resolve(false));
-  });
+function markDailyBonusClaimed(){
+  localStorage.setItem(DAILY_BONUS_KEY, _todayKey());
 }
-
 function maybeOfferDailyBonusInt(){
   if (hasClaimedDailyBonusToday() || dailyBonusPrompted) return;
   dailyBonusPrompted = true;
@@ -282,16 +235,37 @@ function maybeOfferDailyBonusInt(){
   }).catch(()=>{ alert('لم يتم عرض الإعلان. جرّب لاحقًا.'); });
 }
 
-/* ========= Extra Lives ========= */
-function getExtraLives(){ return +(localStorage.getItem('extraLives') || '0'); }
-function setExtraLives(v){ v = Math.max(0, v|0); localStorage.setItem('extraLives', String(v)); updateLivesUI(); }
-function updateLivesUI(){ document.getElementById('lives').textContent = getExtraLives(); }
+/* ========= Extra Lives (تخزين دائم + قراءة) ========= */
+function getExtraLives(){ 
+  return +(localStorage.getItem('extraLives') || '0'); 
+}
 
-/* Rewards table */
+function setExtraLives(v){
+  v = Math.max(0, v|0);
+  localStorage.setItem('extraLives', String(v));
+  updateLivesUI();   // تحديث العرض في المنيو
+}
+
+function updateLivesUI(){ 
+  document.getElementById('lives').textContent = getExtraLives();
+}
+
+/* Rewards */
 const baseRewards={256:0.0002,512:0.0003,1024:0.0015,2048:0.002};
 let msRunCount={256:0,512:0,1024:0,2048:0};
 let msSeenTilesInRun={256:0,512:0,1024:0,2048:0};
 let reached2048InRun=false;
+
+/* AdsGram */
+let AdController=null, RewardController=null;
+try{
+  if(window.Adsgram&&typeof window.Adsgram.init==="function"){
+    AdController=window.Adsgram.init({blockId:"int-14155"});
+    RewardController=window.Adsgram.init({blockId:"14159"});
+  }
+}catch(_){}
+function showInterstitialAd(){ try{ if(!AdController||typeof AdController.show!=="function")return Promise.resolve(); return AdController.show().catch(()=>{});}catch(_){return Promise.resolve();} }
+function showRewardAd(){ try{ if(!RewardController||typeof RewardController.show!=="function")return Promise.resolve(false); return RewardController.show().then(()=>true).catch(()=>false);}catch(_){return Promise.resolve(false);} }
 
 function offerAndMaybeAward(ms,tier){
   const base=baseRewards[ms]; if(!base) return;
@@ -301,7 +275,10 @@ function offerAndMaybeAward(ms,tier){
   showRewardAd().then(ok=>{
     if(!ok) return;
     setBalance(getBalance()+amount);
-    if (ms === 512 || ms === 2048) setExtraLives(getExtraLives() + 1);
+   if (ms === 512 || ms === 2048) {
+  setExtraLives(getExtraLives() + 1);   // تخزين دائم
+}
+
     alert(`✅ Reward added: $${amount.toFixed(4)}${(ms===512||ms===2048)?' + Extra Life':''}`);
   });
 }
@@ -321,8 +298,8 @@ function draw(){
     const v=grid[r][c];
     const d=document.createElement('div'); d.className='cell'; d.textContent=v||''; d.style.background=v?tileColor(v):'#cdc1b4'; d.style.color=v>=8?'#f9f6f2':'#776e65'; gridEl.appendChild(d);
     if(v===256||v===512||v===1024||v===2048) currentCounts[v]++;
-    if(v===1024&&!shown1024Ad){ shown1024Ad=true; showTelega(TELEG_UID_1024); }
-    if(v===2048&&!shown2048Ad){ shown2048Ad=true; showTelega(TELEG_UID_2048); }
+    if(v===1024&&!shown1024Ad){shown1024Ad=true;showTelega(TELEG_UID_1024);}
+    if(v===2048&&!shown2048Ad){shown2048Ad=true;showTelega(TELEG_UID_2048);}
   }
   [256,512,1024,2048].forEach(ms=>{
     const prev=msSeenTilesInRun[ms]||0, now=currentCounts[ms]||0, delta=Math.max(0,now-prev);
@@ -337,9 +314,7 @@ function draw(){
         else if(tier==='half') offerAndMaybeAward(ms,'half');
       }
       msSeenTilesInRun[ms]=now;
-    } else {
-      msSeenTilesInRun[ms]=now;
-    }
+    } else msSeenTilesInRun[ms]=now;
   });
 }
 function tileColor(v){const m={2:'#eee4da',4:'#ede0c8',8:'#f2b179',16:'#f59563',32:'#f67c5f',64:'#f65e3b',128:'#edcf72',256:'#edcc61',512:'#edc850',1024:'#edc53f',2048:'#edc22e'}; return m[v]||'#3c3a32';}
@@ -354,15 +329,7 @@ function move(dir){
   const after=JSON.stringify(grid);
   if(before!==after){ addTile(); updateBest(); draw(); if(gameOver()) endGame(); }
 }
-function gameOver(){
-  if(randomEmpty()) return false;
-  for(let r=0;r<size;r++)for(let c=0;c<size;c++){
-    const v=grid[r][c];
-    if(r+1<size&&grid[r+1][c]===v) return false;
-    if(c+1<size&&grid[r][c+1]===v) return false;
-  }
-  return true;
-}
+function gameOver(){ if(randomEmpty()) return false; for(let r=0;r<size;r++)for(let c=0;c<size;c++){const v=grid[r][c]; if(r+1<size&&grid[r+1][c]===v) return false; if(c+1<size&&grid[r][c+1]===v) return false;} return true; }
 function updateBest(){ if(score>best){ best=score; localStorage.setItem('best2048',best);} }
 
 const startPos={x:0,y:0}; let dragging=false;
@@ -401,9 +368,9 @@ document.getElementById('mAbout').onclick = () => {
 - أي محاولة سحب بتتبعت لإدارتنا للمراجعة قبل التحويل.`);
 };
 
-/* امسح أقل قيمة موجودة لتفادي حذف 512/1024 */
+// امسح أقل قيمة موجودة (نفضّل 2 ثم 4 وهكذا) لتفادي حذف 512/1024
 function reviveBoard(){
-  const pref = [2,4,8,16,32,64,128,256,512,1024,2048];
+  const pref = [2,4,8,16,32,64,128,256,512,1024,2048]; // ترتيب تفضيلي من الأصغر للأكبر
   for (const val of pref){
     const spots = [];
     for (let r=0; r<size; r++){
@@ -413,30 +380,29 @@ function reviveBoard(){
     }
     if (spots.length){
       const [rr,cc] = spots[Math.floor(Math.random()*spots.length)];
-      grid[rr][cc] = 0;
+      grid[rr][cc] = 0;   // نفرّغ خانة من أصغر قيمة متاحة
       updateBest();
       return;
     }
   }
+  // لو لأي سبب مفيش غير صفار (نادر جداً) مفيش حاجة نعملها
 }
 
 function endGame(){
-  const lives = getExtraLives();
-  if (lives > 0) {
-    setExtraLives(lives - 1);
-    reviveBoard();
-    draw();
-    alert('🔥 Extra Life used! You are back in the game.');
-    return;
-  }
+  // ✅ استخدم Extra Life تلقائيًا قبل أي إعلان
+const lives = getExtraLives();
+if (lives > 0) {
+  setExtraLives(lives - 1);     // استهلاك لايف واحد
+  reviveBoard();                // رجّع حركة
+  draw();
+  alert('🔥 Extra Life used! You are back in the game.');
+  return;                       // نرجع للعبة وممنسألش عن إعلان
+}
 
   if(!continuedOnce){
     const wantContinue=confirm("Game over! Your score: "+score+"\n\nWatch an ad to continue?");
     if(wantContinue){
-      showRewardAd().then(ok=>{
-        if(ok){ continuedOnce=true; reviveBoard(); draw(); }
-        else { showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score)); }
-      });
+      showRewardAd().then(ok=>{ if(ok){ continuedOnce=true; reviveBoard(); draw(); } else { showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score)); } });
       return;
     } else {
       showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
@@ -446,11 +412,13 @@ function endGame(){
   showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
 }
 
-/* Start */
+/* ابدأ اللعبة بعد ما الصفحة تجهز */
+/* ابدأ اللعبة + عرض Daily Bonus */
 window.addEventListener('load', () => {
   setup();
-  setTimeout(maybeOfferDailyBonusInt, 1500);
+  setTimeout(maybeOfferDailyBonusInt, 1500); // بعد ثانية ونص من بداية اللعبة
 });
+
 </script>
 </body>
 </html>
