@@ -1,1043 +1,424 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>2048 Mini - إصلاح الإعلانات</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>2048 Mini — MVP</title>
+
+  <!-- Telegram Mini App SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- AdsGram SDK -->
+  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+  <!-- Telega.io SDK -->
   <script src="https://inapp.telega.io/sdk/v1/sdk.js"></script>
+
   <style>
-    :root {
-      --bg: #faf8ef;
-      --board: #bbada0;
-      --tile: #cdc1b4;
-      --text: #776e65;
-      --btn: #8f7a66;
-      --white: #fff;
-      --accent: #edc22e;
+    :root{ --bg:#faf8ef; --board:#bbada0; --tile:#cdc1b4; --text:#776e65; --btn:#8f7a66; --white:#fff; }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,Arial;padding:16px;margin:0;background:var(--bg);color:var(--text);}
+    .wrap{max-width:480px;margin:0 auto;position:relative}
+    h1{margin:0 0 8px;font-size:32px;line-height:1.1;padding-right:50px}
+    .top{display:flex;gap:8px;justify-content:center;margin-bottom:8px}
+    .card{background:var(--board);color:var(--white);border-radius:12px;padding:8px 12px;min-width:100px;text-align:center}
+    .grid{background:var(--board);border-radius:12px;padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;touch-action:none}
+    .cell{height:80px;background:var(--tile);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px}
+    button{padding:10px 12px;border:0;border-radius:12px;font-weight:700;background:var(--btn);color:var(--white);cursor:pointer}
+    .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;justify-items:center;align-items:center}
+    .controls .spacer{height:0}
+    .arrow{min-width:96px;min-height:66px;font-size:20px}
+    .menuBtn{position:absolute;top:8px;right:8px;width:32px;height:32px;padding:0;min-width:0;min-height:0;line-height:1;background:transparent;color:var(--btn);border:2px solid var(--btn);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;z-index:11}
+    .backdrop{position:fixed;inset:0;background:#0007;display:none}
+    .backdrop.show{display:block}
+    .drawer{position:fixed;top:0;right:0;height:100dvh;width:220px;background:#f5efe6;box-shadow:0 0 30px #0003;padding:16px 14px;transform:translateX(100%);transition:transform .25s ease;z-index:12}
+    .drawer.open{transform:translateX(0)}
+    .drawer h3{margin:4px 0 12px}
+    .menuItem{display:block;width:100%;margin:8px 0;padding:12px 14px;background:var(--btn);color:#fff;border:0;border-radius:12px;font-weight:700;cursor:pointer}
+    .menuInfo{margin:6px 0 10px;font-weight:700;color:#333}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    small{opacity:.7}
+
+    /* Splash */
+    .splash{
+      position:fixed;inset:0;z-index:1000;
+      background:radial-gradient(120% 120% at 50% -20%,#fdf7ea 0%,#efe6d9 45%,#e7dccf 100%);
+      display:none; /* 🔒 مقفولة افتراضيًا كـ Hotfix */
+      align-items:center;justify-content:center;
+      transition:opacity .35s ease,visibility .35s ease;
     }
-    
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      padding: 20px;
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-    }
-    
-    .container {
-      max-width: 500px;
-      margin: 0 auto;
-      position: relative;
-    }
-    
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    
-    h1 {
-      font-size: 40px;
-      color: var(--text);
-      text-align: center;
-      margin-bottom: 10px;
-    }
-    
-    .score-container {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    
-    .score-box {
-      background: var(--board);
-      color: var(--white);
-      border-radius: 6px;
-      padding: 10px 15px;
-      text-align: center;
-      flex: 1;
-    }
-    
-    .score-title {
-      font-size: 14px;
-      text-transform: uppercase;
-    }
-    
-    .score-value {
-      font-size: 22px;
-      font-weight: bold;
-    }
-    
-    .game-container {
-      background: var(--board);
-      border-radius: 6px;
-      padding: 15px;
-      position: relative;
-      margin-bottom: 20px;
-    }
-    
-    .game-matrix {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      grid-gap: 10px;
-    }
-    
-    .cell {
-      width: 100%;
-      height: 0;
-      padding-bottom: 100%;
-      background: var(--tile);
-      border-radius: 5px;
-      position: relative;
-    }
-    
-    .tile {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 35px;
-      border-radius: 5px;
-      background: #eee4da;
-      color: var(--text);
-    }
-    
-    .tile-2 { background: #eee4da; }
-    .tile-4 { background: #ede0c8; }
-    .tile-8 { background: #f2b179; color: var(--white); }
-    .tile-16 { background: #f59563; color: var(--white); }
-    .tile-32 { background: #f67c5f; color: var(--white); }
-    .tile-64 { background: #f65e3b; color: var(--white); }
-    .tile-128 { background: #edcf72; color: var(--white); font-size: 30px; }
-    .tile-256 { background: #edcc61; color: var(--white); font-size: 30px; }
-    .tile-512 { background: #edc850; color: var(--white); font-size: 30px; }
-    .tile-1024 { background: #edc53f; color: var(--white); font-size: 25px; }
-    .tile-2048 { background: #edc22e; color: var(--white); font-size: 25px; }
-    
-    .controls {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    
-    .ctrl-btn {
-      padding: 15px 5px;
-      border: none;
-      border-radius: 6px;
-      font-weight: bold;
-      background: var(--btn);
-      color: var(--white);
-      cursor: pointer;
-      font-size: 18px;
-    }
-    
-    .menu-btn {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      width: 40px;
-      height: 40px;
-      border: none;
-      border-radius: 50%;
-      background: var(--btn);
-      color: var(--white);
-      font-size: 20px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10;
-    }
-    
-    .menu {
-      position: fixed;
-      top: 0;
-      right: -300px;
-      width: 300px;
-      height: 100%;
-      background: var(--white);
-      box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
-      padding: 20px;
-      transition: right 0.3s ease;
-      z-index: 100;
-      overflow-y: auto;
-    }
-    
-    .menu.open {
-      right: 0;
-    }
-    
-    .menu-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #eee;
-    }
-    
-    .close-menu {
-      background: none;
-      border: none;
-      font-size: 24px;
-      cursor: pointer;
-      color: var(--text);
-    }
-    
-    .menu-item {
-      display: block;
-      width: 100%;
-      padding: 15px;
-      margin: 10px 0;
-      background: var(--btn);
-      color: var(--white);
-      border: none;
-      border-radius: 6px;
-      font-weight: bold;
-      text-align: center;
-      cursor: pointer;
-    }
-    
-    .menu-section {
-      margin: 20px 0;
-      padding: 15px;
-      background: #f5f3f0;
-      border-radius: 6px;
-    }
-    
-    .menu-title {
-      font-size: 18px;
-      margin-bottom: 10px;
-      color: var(--text);
-    }
-    
-    .menu-value {
-      font-size: 24px;
-      font-weight: bold;
-      color: var(--accent);
-      text-align: center;
-      margin: 10px 0;
-      font-family: monospace;
-    }
-    
-    .overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      display: none;
-      z-index: 90;
-    }
-    
-    .overlay.open {
-      display: block;
-    }
-    
-    .message-box {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: var(--white);
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
-      z-index: 110;
-      text-align: center;
-      max-width: 90%;
-      width: 350px;
-      display: none;
-    }
-    
-    .message-box.open {
-      display: block;
-    }
-    
-    .message-title {
-      font-size: 24px;
-      margin-bottom: 15px;
-      color: var(--text);
-    }
-    
-    .message-text {
-      margin-bottom: 20px;
-      line-height: 1.5;
-    }
-    
-    .message-buttons {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-    }
-    
-    .msg-btn {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 5px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    
-    .btn-primary {
-      background: var(--accent);
-      color: var(--white);
-    }
-    
-    .btn-secondary {
-      background: #e0e0e0;
-      color: var(--text);
-    }
-    
-    .game-over {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(238, 228, 218, 0.85);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      border-radius: 6px;
-      z-index: 5;
-    }
-    
-    .game-over-text {
-      font-size: 30px;
-      font-weight: bold;
-      color: var(--text);
-      margin-bottom: 20px;
-    }
-    
-    .try-again {
-      padding: 12px 24px;
-      background: var(--btn);
-      color: var(--white);
-      border: none;
-      border-radius: 5px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    
-    @media (max-width: 500px) {
-      h1 {
-        font-size: 32px;
-      }
-      
-      .score-value {
-        font-size: 18px;
-      }
-      
-      .tile {
-        font-size: 24px;
-      }
-      
-      .tile-128, .tile-256, .tile-512 {
-        font-size: 22px;
-      }
-      
-      .tile-1024, .tile-2048 {
-        font-size: 18px;
-      }
-    }
+    .splash.show{display:flex}
+    .splash.hide{opacity:0;visibility:hidden}
+    .splash-card{width:min(88vw,420px);background:#ffffffcc;border:1px solid #e9dfd3;border-radius:18px;box-shadow:0 10px 30px #00000014;padding:18px 18px 14px;text-align:center;backdrop-filter:blur(4px)}
+    .splash-logo{width:100%;height:auto;border-radius:12px;display:block}
+    .splash-title{margin:10px 0 6px;font-weight:800;letter-spacing:.4px;color:#5a4a3d}
+    .splash-sub{margin:0 0 8px;color:#7b6d61;font-weight:600;font-size:14px}
+    .bar{height:8px;width:100%;background:#eadfce;border-radius:999px;overflow:hidden}
+    .bar>span{display:block;height:100%;width:0%;background:linear-gradient(90deg,#8f7a66,#b59d84);border-radius:999px;animation:fill 2.2s ease forwards}
+    @keyframes fill{to{width:100%}}
+    .tap-hint{margin-top:8px;font-size:12px;color:#998a7f}
   </style>
 </head>
 <body>
-  <div class="container">
-    <button class="menu-btn" id="menuBtn">☰</button>
-    
-    <h1>2048 Mini</h1>
-    
-    <div class="score-container">
-      <div class="score-box">
-        <div class="score-title">النقاط</div>
-        <div class="score-value" id="score">0</div>
-      </div>
-      <div class="score-box">
-        <div class="score-title">أفضل نتيجة</div>
-        <div class="score-value" id="best">0</div>
-      </div>
-    </div>
-    
-    <div class="game-container">
-      <div class="game-matrix" id="grid"></div>
-      <div class="game-over" id="gameOver" style="display: none;">
-        <div class="game-over-text">انتهت اللعبة!</div>
-        <div class="score-title">النقاط النهائية: <span id="finalScore">0</span></div>
-        <button class="try-again" id="tryAgain">حاول مرة أخرى</button>
-      </div>
-    </div>
-    
-    <div class="controls">
-      <div></div>
-      <button class="ctrl-btn" id="up">↑</button>
-      <div></div>
-      <button class="ctrl-btn" id="left">←</button>
-      <button class="ctrl-btn" id="down">↓</button>
-      <button class="ctrl-btn" id="right">→</button>
-    </div>
-    
-    <p style="text-align: center; font-size: 14px; opacity: 0.7;">
-      استخدم الأسهم للتحريك أو اسحب على الشاشة
-    </p>
+
+<!-- Splash (مقفول افتراضيًا؛ نفعّله فقط لو الصورة جاهزة) -->
+<div id="splash" class="splash">
+  <div class="splash-card" id="splashCard">
+    <img id="splashImg" class="splash-logo" alt="Earn USDT — 2048 Mini">
+    <h3 class="splash-title">Earn USDT while you play</h3>
+    <p class="splash-sub">Watch ads at milestones and collect rewards</p>
+    <div class="bar"><span></span></div>
+    <div class="tap-hint">Tap to continue</div>
   </div>
-  
-  <div class="overlay" id="overlay"></div>
-  
-  <div class="menu" id="menu">
-    <div class="menu-header">
-      <h2>القائمة</h2>
-      <button class="close-menu" id="closeMenu">×</button>
-    </div>
-    
-    <div class="menu-section">
-      <div class="menu-title">رصيدك (USDT)</div>
-      <div class="menu-value" id="balance">0.0000</div>
-    </div>
-    
-    <div class="menu-section">
-      <div class="menu-title">حياة إضافية</div>
-      <div class="menu-value" id="lives">0</div>
-    </div>
-    
-    <button class="menu-item" id="mNew">لعبة جديدة</button>
-    <button class="menu-item" id="mInvite">دعوة صديق</button>
-    <button class="menu-item" id="mShare">مشاركة النتيجة</button>
-    <button class="menu-item" id="mClaim" style="display: none;">سحب الرصيد</button>
-    <button class="menu-item" id="mAbout">عن اللعبة</button>
-  </div>
-  
-  <div class="message-box" id="messageBox">
-    <div class="message-title" id="msgTitle">العنوان</div>
-    <div class="message-text" id="msgText">النص الخاص بالرسالة</div>
-    <div class="message-buttons">
-      <button class="msg-btn btn-secondary" id="msgCancel">إلغاء</button>
-      <button class="msg-btn btn-primary" id="msgOk">موافق</button>
-    </div>
+</div>
+
+<div class="wrap">
+  <h1>2048 Mini</h1>
+  <button id="menuBtn" class="menuBtn" aria-label="Menu">☰</button>
+
+  <div class="top">
+    <div class="card">Score<br><b id="score">0</b></div>
+    <div class="card">Best<br><b id="best">0</b></div>
   </div>
 
-  <script>
-    // ===== تهيئة Telega.io SDK =====
-    let telegaAds = null;
-    let telegaRewarded = null;
-    
-    function initTelega() {
-      try {
-        if (window.TelegaIn) {
-          console.log("تم العثور على TelegaIn SDK");
-          
-          // تهيئة الإعلانات البينية
-          if (window.TelegaIn.AdsController) {
-            telegaAds = window.TelegaIn.AdsController.create_miniapp({
-              token: 'a1de3947-839f-4b2a-aee0-5a3b1412c818'
-            });
-            console.log("تم تهيئة AdsController");
-          }
-          
-          // تهيئة الإعلانات الممولة
-          if (window.TelegaIn.RewardedController) {
-            telegaRewarded = window.TelegaIn.RewardedController.create_miniapp({
-              token: 'a1de3947-839f-4b2a-aee0-5a3b1412c818'
-            });
-            console.log("تم تهيئة RewardedController");
-          }
-        } else {
-          console.warn("لم يتم العثور على TelegaIn SDK");
-        }
-      } catch (e) {
-        console.error("خطأ في تهيئة Telega:", e);
+  <div class="grid" id="grid"></div>
+
+  <div class="controls">
+    <span class="spacer"></span>
+    <button id="up" class="arrow">▲</button>
+    <span class="spacer"></span>
+    <button id="left" class="arrow">◀</button>
+    <button id="down" class="arrow">▼</button>
+    <button id="right" class="arrow">▶</button>
+  </div>
+
+  <p><small>Swipe on the board or use the arrows. MVP build.</small></p>
+</div>
+
+<div id="backdrop" class="backdrop"></div>
+<div id="drawer" class="drawer">
+  <h3>Menu</h3>
+  <div class="menuInfo">Balance (USDT): <span id="balance" class="mono">0.0000</span></div>
+  <div class="menuInfo">Extra Lives: <span id="lives" class="mono">0</span></div>
+  <button id="mNew" class="menuItem">New Game</button>
+  <button id="mInvite" class="menuItem">Invite Friend</button>
+  <button id="mShare" class="menuItem">Share</button>
+  <button id="mAbout" class="menuItem">About</button>
+
+  <!-- زر Claim -->
+  <button id="mClaim" class="menuItem" style="display:none">Claim</button>
+</div>
+
+</div>
+
+<script>
+/* ===== حارس أخطاء عام ما يوقفش الصفحة ===== */
+window.addEventListener('error', e => { try{ console.warn(e.message); }catch(_){} });
+
+/* ===== Telegram ===== */
+try{ const tg = window.Telegram?.WebApp; if (tg) tg.expand(); }catch(_){}
+
+/* ===== Telega helpers (محاطة بـ try) ===== */
+let telegaAds=null;
+try{
+  if (window.TelegaIn && window.TelegaIn.AdsController) {
+    telegaAds = window.TelegaIn.AdsController.create_miniapp({
+      token: 'a14e3947-839f-4b2a-aee0-5a3b1412c818'
+    });
+  }
+}catch(_){}
+const TELEG_UID_1024="3a1f1a7a-028c-4909-b20b-f4733d02fcc5";
+const TELEG_UID_2048="6a5cb9ac-15d0-4da2-bbca-916236f1bc83";
+function showTelega(uid){
+  try{
+    if (window.ads && typeof window.ads.ad_show==="function") return window.ads.ad_show({adBlockUuid:uid});
+    if (telegaAds && typeof telegaAds.show==="function") return telegaAds.show();
+  }catch(e){console.warn("Telega show error:",e)}
+  return Promise.resolve();
+}
+
+/* ===== Splash ===== */
+const SPLASH_IMG_URL = "https://raw.githubusercontent.com/mahmoudelhag2012/tg-2048-mvp/main/splash-usdt-2048.png";
+const splash = document.getElementById('splash');
+const splashImg = document.getElementById('splashImg');
+
+function hideSplash(){
+  splash.classList.add('hide');
+  setTimeout(()=> splash.style.display='none', 400);
+}
+function showSplash(){
+  splash.classList.remove('hide');
+  splash.classList.add('show');
+}
+try{
+  splashImg.src = SPLASH_IMG_URL;
+  splashImg.onload = ()=>{ showSplash(); setTimeout(hideSplash, 2200); };
+  splashImg.onerror = ()=>{ /* لو الصورة فشلت، كمّل اللعب عادي */ hideSplash(); };
+  splash.addEventListener('click', hideSplash);
+}catch(_){ hideSplash(); }
+
+/* ===== Game State ===== */
+const size=4; let grid=[], score=0, best=+localStorage.getItem('best2048')||0;
+const gridEl=document.getElementById('grid'); const scoreEl=document.getElementById('score'); const bestEl=document.getElementById('best');
+
+/* ===== Balance / Rewards ===== */
+const balanceEl = document.getElementById('balance');
+function getBalance(){ return +(localStorage.getItem('usdBalance')||'0'); }
+function setBalance(v){ const fixed=Math.max(0,v); localStorage.setItem('usdBalance',fixed.toFixed(4)); updateBalanceUI(); }
+function updateBalanceUI(){ 
+  const bal = (+localStorage.getItem('usdBalance')||0).toFixed(4);
+  balanceEl.textContent = bal;
+
+  // إظهار زر Claim لو الرصيد >= 1
+  const claimBtn = document.getElementById('mClaim');
+  if(+bal >= 1){
+    claimBtn.style.display = 'block';
+  } else {
+    claimBtn.style.display = 'none';
+  }
+}
+updateBalanceUI();
+
+// حدث الضغط على زر Claim
+document.getElementById('mClaim').onclick = () => {
+  const amount = (+localStorage.getItem('usdBalance')||0).toFixed(4);
+  const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'unknown';
+  const username = window.Telegram?.WebApp?.initDataUnsafe?.user?.username || 'unknown';
+
+  // إرسال طلب للبوت
+  fetch("https://api.telegram.org/bot8173990075:AAFRvQLYjTFISspmepGXISVSQEu_ykPcBWg/sendMessage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: "603092693", // ID بتاعك
+      text: `طلب سحب ✅\nUser: @${username} (${userId})\nBalance: $${amount}`
+    })
+  }).then(()=> {
+  alert("✅ تم إرسال طلب السحب للبوت");
+  // تصفير الرصيد
+  localStorage.setItem('usdBalance','0.0000');
+  updateBalanceUI();
+  // إخفاء زر Claim
+  document.getElementById('mClaim').style.display = 'none';
+})
+.catch(()=> alert("❌ حصل خطأ، جرّب تاني"));
+
+
+};
+
+
+
+/* ====== Daily Bonus via Interstitial (مرّة يوميًا) ====== */
+const DAILY_BONUS_AMOUNT = 0.0001;      // مبلغ صغير جدًا
+const DAILY_BONUS_KEY    = 'dailyBonusDate';
+let   dailyBonusPrompted = false;       // عشان ما نكرر الرسالة في نفس الجلسة
+
+function _todayKey(){
+  const d = new Date();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+function hasClaimedDailyBonusToday(){
+  return localStorage.getItem(DAILY_BONUS_KEY) === _todayKey();
+}
+function markDailyBonusClaimed(){
+  localStorage.setItem(DAILY_BONUS_KEY, _todayKey());
+}
+function maybeOfferDailyBonusInt(){
+  if (hasClaimedDailyBonusToday() || dailyBonusPrompted) return;
+  dailyBonusPrompted = true;
+  const ok = confirm(`🎁 Daily Bonus\nاحصل على $${DAILY_BONUS_AMOUNT.toFixed(4)} بعد مشاهدة إعلان.`);
+  if (!ok) return;
+  showInterstitialAd().then(()=>{
+    setBalance(getBalance() + DAILY_BONUS_AMOUNT);
+    markDailyBonusClaimed();
+    alert(`✅ Bonus added: $${DAILY_BONUS_AMOUNT.toFixed(4)}`);
+  }).catch(()=>{ alert('لم يتم عرض الإعلان. جرّب لاحقًا.'); });
+}
+
+/* ========= Extra Lives (تخزين دائم + قراءة) ========= */
+function getExtraLives(){ 
+  return +(localStorage.getItem('extraLives') || '0'); 
+}
+
+function setExtraLives(v){
+  v = Math.max(0, v|0);
+  localStorage.setItem('extraLives', String(v));
+  updateLivesUI();   // تحديث العرض في المنيو
+}
+
+function updateLivesUI(){ 
+  document.getElementById('lives').textContent = getExtraLives();
+}
+
+/* Rewards */
+const baseRewards={256:0.0002,512:0.0003,1024:0.0015,2048:0.002};
+let msRunCount={256:0,512:0,1024:0,2048:0};
+let msSeenTilesInRun={256:0,512:0,1024:0,2048:0};
+let reached2048InRun=false;
+
+/* AdsGram */
+let AdController=null, RewardController=null;
+try{
+  if(window.Adsgram&&typeof window.Adsgram.init==="function"){
+    AdController=window.Adsgram.init({blockId:"int-14155"});
+    RewardController=window.Adsgram.init({blockId:"14159"});
+  }
+}catch(_){}
+function showInterstitialAd(){ try{ if(!AdController||typeof AdController.show!=="function")return Promise.resolve(); return AdController.show().catch(()=>{});}catch(_){return Promise.resolve();} }
+function showRewardAd(){ try{ if(!RewardController||typeof RewardController.show!=="function")return Promise.resolve(false); return RewardController.show().then(()=>true).catch(()=>false);}catch(_){return Promise.resolve(false);} }
+
+function offerAndMaybeAward(ms,tier){
+  const base=baseRewards[ms]; if(!base) return;
+  const amount=tier==='full'?base:base/2;
+  const want=confirm(`Milestone ${ms} reached!\n${tier==='full'?'Claim ':'Claim (half) '}$${amount.toFixed(4)} by watching an ad?\nOK = Watch & claim,  Cancel = Skip`);
+  if(!want) return;
+  showRewardAd().then(ok=>{
+    if(!ok) return;
+    setBalance(getBalance()+amount);
+   if (ms === 512 || ms === 2048) {
+  setExtraLives(getExtraLives() + 1);   // تخزين دائم
+}
+
+    alert(`✅ Reward added: $${amount.toFixed(4)}${(ms===512||ms===2048)?' + Extra Life':''}`);
+  });
+}
+
+let continuedOnce=false, shown1024Ad=false, shown2048Ad=false;
+
+/* Core game */
+function emptyGrid(){grid=Array.from({length:size},()=>Array(size).fill(0));}
+function randomEmpty(){const e=[]; for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(!grid[r][c])e.push([r,c]); return e.length?e[Math.floor(Math.random()*e.length)]:null;}
+function addTile(){const pos=randomEmpty(); if(!pos) return false; grid[pos[0]][pos[1]] = Math.random()<0.9?2:4; return true;}
+function setup(){ emptyGrid(); addTile(); addTile(); score=0; continuedOnce=false; shown1024Ad=false; shown2048Ad=false; msRunCount={256:0,512:0,1024:0,2048:0}; msSeenTilesInRun={256:0,512:0,1024:0,2048:0}; reached2048InRun=false; draw(); }
+
+function draw(){
+  gridEl.innerHTML=''; scoreEl.textContent=score; bestEl.textContent=best;
+  const currentCounts={256:0,512:0,1024:0,2048:0};
+  for(let r=0;r<size;r++)for(let c=0;c<size;c++){
+    const v=grid[r][c];
+    const d=document.createElement('div'); d.className='cell'; d.textContent=v||''; d.style.background=v?tileColor(v):'#cdc1b4'; d.style.color=v>=8?'#f9f6f2':'#776e65'; gridEl.appendChild(d);
+    if(v===256||v===512||v===1024||v===2048) currentCounts[v]++;
+    if(v===1024&&!shown1024Ad){shown1024Ad=true;showTelega(TELEG_UID_1024);}
+    if(v===2048&&!shown2048Ad){shown2048Ad=true;showTelega(TELEG_UID_2048);}
+  }
+  [256,512,1024,2048].forEach(ms=>{
+    const prev=msSeenTilesInRun[ms]||0, now=currentCounts[ms]||0, delta=Math.max(0,now-prev);
+    if(delta>0){
+      for(let i=0;i<delta;i++){
+        let tier='none';
+        if(msRunCount[ms]===0) tier='full';
+        else if(reached2048InRun) tier='half';
+        if(ms===2048&&msRunCount[2048]===0) reached2048InRun=true;
+        msRunCount[ms]++;
+        if(tier==='full') offerAndMaybeAward(ms,'full');
+        else if(tier==='half') offerAndMaybeAward(ms,'half');
+      }
+      msSeenTilesInRun[ms]=now;
+    } else msSeenTilesInRun[ms]=now;
+  });
+}
+function tileColor(v){const m={2:'#eee4da',4:'#ede0c8',8:'#f2b179',16:'#f59563',32:'#f67c5f',64:'#f65e3b',128:'#edcf72',256:'#edcc61',512:'#edc850',1024:'#edc53f',2048:'#edc22e'}; return m[v]||'#3c3a32';}
+function slide(row){const f=row.filter(x=>x); for(let i=0;i<f.length-1;i++){ if(f[i]===f[i+1]){ f[i]*=2; score+=f[i]; f.splice(i+1,1);} } while(f.length<size) f.push(0); return f;}
+function rotate(times){for(let t=0;t<times;t++){const g=Array.from({length:size},()=>Array(size).fill(0)); for(let r=0;r<size;r++)for(let c=0;c<size;c++) g[c][size-1-r]=grid[r][c]; grid=g;}}
+
+function move(dir){
+  const before=JSON.stringify(grid);
+  if(dir===2) rotate(2); else if(dir===1) rotate(3); else if(dir===3) rotate(1);
+  for(let r=0;r<size;r++) grid[r]=slide(grid[r]);
+  if(dir===2) rotate(2); else if(dir===1) rotate(1); else if(dir===3) rotate(3);
+  const after=JSON.stringify(grid);
+  if(before!==after){ addTile(); updateBest(); draw(); if(gameOver()) endGame(); }
+}
+function gameOver(){ if(randomEmpty()) return false; for(let r=0;r<size;r++)for(let c=0;c<size;c++){const v=grid[r][c]; if(r+1<size&&grid[r+1][c]===v) return false; if(c+1<size&&grid[r][c+1]===v) return false;} return true; }
+function updateBest(){ if(score>best){ best=score; localStorage.setItem('best2048',best);} }
+
+const startPos={x:0,y:0}; let dragging=false;
+function touchStart(e){dragging=true; const t=e.touches?e.touches[0]:e; startPos.x=t.clientX; startPos.y=t.clientY;}
+function touchEnd(e){ if(!dragging) return; dragging=false; const t=e.changedTouches?e.changedTouches[0]:e; const dx=t.clientX-startPos.x, dy=t.clientY-startPos.y; if(Math.abs(dx)>Math.abs(dy)){ move(dx>0?2:0);} else { move(dy>0?3:1);} }
+document.getElementById('grid').addEventListener('touchstart',touchStart);
+document.getElementById('grid').addEventListener('touchend',touchEnd);
+document.getElementById('grid').addEventListener('mousedown',touchStart);
+document.getElementById('grid').addEventListener('mouseup',touchEnd);
+
+document.getElementById('left').onclick=()=>move(0);
+document.getElementById('up').onclick=()=>move(1);
+document.getElementById('right').onclick=()=>move(2);
+document.getElementById('down').onclick=()=>move(3);
+
+const menuBtn=document.getElementById('menuBtn'); const drawer=document.getElementById('drawer'); const backdrop=document.getElementById('backdrop');
+function openDrawer(){ drawer.classList.add('open'); backdrop.classList.add('show'); }
+function closeDrawer(){ drawer.classList.remove('open'); backdrop.classList.remove('show'); }
+menuBtn.addEventListener('click', openDrawer); backdrop.addEventListener('click', closeDrawer);
+document.getElementById('mNew').onclick=()=>{ closeDrawer(); setup(); };
+document.getElementById('mInvite').onclick=()=>{ closeDrawer(); prompt('Copy link:','https://t.me/Smart2048_bot'); };
+document.getElementById('mShare').onclick=()=>{ closeDrawer(); const text=`I scored ${score} in 2048 Mini!`; if(navigator.share){navigator.share({text});} else {prompt('Copy and share your score:', text);} };
+document.getElementById('mAbout').onclick = () => {
+  closeDrawer();
+  alert(`📌 عن اللعبة
+لعبة Smart 2048 Mini نسخة مطوّرة من 2048. عند وصولك لأي مايلستون (256 / 512 / 1024 / 2048) تقدر تشاهد إعلان وتاخد مكافأة بالدولار (USDT).
+🎁 512 و 2048 يمنحوك كمان Extra Life تلقائيًا.
+🎯 يظهر زر Claim لما الرصيد يوصل 1.0000 USDT.
+
+💰 طرق السحب:
+- داخل مصر: كل المحافظ الإلكترونية (Vodafone Cash – Orange Cash – Etisalat Cash – WE Pay) + InstaPay + أي حساب بنكي، أو Binance بكود "Red Packet".
+- خارج مصر: Binance بكود "Red Packet".
+
+ℹ️ ملاحظات:
+- في مكافأة يومية صغيرة بعد مشاهدة إعلان (Daily Bonus).
+- أي محاولة سحب بتتبعت لإدارتنا للمراجعة قبل التحويل.`);
+};
+
+// امسح أقل قيمة موجودة (نفضّل 2 ثم 4 وهكذا) لتفادي حذف 512/1024
+function reviveBoard(){
+  const pref = [2,4,8,16,32,64,128,256,512,1024,2048]; // ترتيب تفضيلي من الأصغر للأكبر
+  for (const val of pref){
+    const spots = [];
+    for (let r=0; r<size; r++){
+      for (let c=0; c<size; c++){
+        if (grid[r][c] === val) spots.push([r,c]);
       }
     }
-    
-    // تعريف معرفات الإعلانات الخاصة بـ Telega.io
-    const TELEG_UID_1024 = "3a1f1a7a-028c-4909-b20b-f4733d02fcc5";
-    const TELEG_UID_2048 = "6a5cb9ac-15d0-4da2-bbca-916236f1be83";
-    
-    // وظائف عرض الإعلانات
-    function showInterstitialAd() {
-      return new Promise((resolve) => {
-        try {
-          if (telegaAds && typeof telegaAds.show === "function") {
-            telegaAds.show()
-              .then(() => resolve(true))
-              .catch(() => resolve(false));
-          } else {
-            console.warn("لا يتوفر AdsController");
-            resolve(false);
-          }
-        } catch (e) {
-          console.error("خطأ في عرض الإعلان البيني:", e);
-          resolve(false);
-        }
-      });
-    }
-    
-    function showRewardAd() {
-      return new Promise((resolve) => {
-        try {
-          if (telegaRewarded && typeof telegaRewarded.show === "function") {
-            telegaRewarded.show()
-              .then(() => resolve(true))
-              .catch(() => resolve(false));
-          } else {
-            console.warn("لا يتوفر RewardedController");
-            resolve(false);
-          }
-        } catch (e) {
-          console.error("خطأ في عرض الإعلان الممول:", e);
-          resolve(false);
-        }
-      });
-    }
-    
-    function showTelegaAd(uid) {
-      try {
-        if (window.ads && typeof window.ads.ad_show === "function") {
-          return window.ads.ad_show({ adBlockUuid: uid });
-        }
-        if (telegaAds && typeof telegaAds.show === "function") {
-          return telegaAds.show();
-        }
-      } catch (e) {
-        console.error("خطأ في عرض إعلان Telega:", e);
-      }
-      return Promise.resolve();
-    }
-    
-    // ===== تهيئة اللعبة =====
-    const size = 4;
-    let grid = [];
-    let score = 0;
-    let best = parseInt(localStorage.getItem('best2048')) || 0;
-    let continuedOnce = false;
-    let shown1024Ad = false;
-    let shown2048Ad = false;
-    
-    const gridEl = document.getElementById('grid');
-    const scoreEl = document.getElementById('score');
-    const bestEl = document.getElementById('best');
-    const balanceEl = document.getElementById('balance');
-    const livesEl = document.getElementById('lives');
-    const gameOverEl = document.getElementById('gameOver');
-    const finalScoreEl = document.getElementById('finalScore');
-    
-    // ===== نظام المكافآت =====
-    const baseRewards = {256: 0.0002, 512: 0.0003, 1024: 0.0015, 2048: 0.002};
-    let msRunCount = {256: 0, 512: 0, 1024: 0, 2048: 0};
-    let msSeenTilesInRun = {256: 0, 512: 0, 1024: 0, 2048: 0};
-    let reached2048InRun = false;
-    
-    function getBalance() {
-      return parseFloat(localStorage.getItem('usdBalance')) || 0;
-    }
-    
-    function setBalance(v) {
-      const fixed = Math.max(0, v);
-      localStorage.setItem('usdBalance', fixed.toFixed(4));
-      updateBalanceUI();
-    }
-    
-    function updateBalanceUI() {
-      const bal = (getBalance()).toFixed(4);
-      balanceEl.textContent = bal;
-      
-      // إظهار زر السحب إذا كان الرصيد >= 1
-      const claimBtn = document.getElementById('mClaim');
-      if (parseFloat(bal) >= 1) {
-        claimBtn.style.display = 'block';
-      } else {
-        claimBtn.style.display = 'none';
-      }
-    }
-    
-    function getExtraLives() {
-      return parseInt(localStorage.getItem('extraLives')) || 0;
-    }
-    
-    function setExtraLives(v) {
-      v = Math.max(0, v);
-      localStorage.setItem('extraLives', v.toString());
-      updateLivesUI();
-    }
-    
-    function updateLivesUI() {
-      livesEl.textContent = getExtraLives();
-    }
-    
-    // ===== وظائف اللعبة الأساسية =====
-    function emptyGrid() {
-      grid = Array.from({length: size}, () => Array(size).fill(0));
-    }
-    
-    function randomEmpty() {
-      const empty = [];
-      for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
-          if (grid[r][c] === 0) {
-            empty.push([r, c]);
-          }
-        }
-      }
-      return empty.length > 0 ? empty[Math.floor(Math.random() * empty.length)] : null;
-    }
-    
-    function addTile() {
-      const pos = randomEmpty();
-      if (!pos) return false;
-      grid[pos[0]][pos[1]] = Math.random() < 0.9 ? 2 : 4;
-      return true;
-    }
-    
-    function setup() {
-      emptyGrid();
-      addTile();
-      addTile();
-      score = 0;
-      continuedOnce = false;
-      shown1024Ad = false;
-      shown2048Ad = false;
-      msRunCount = {256: 0, 512: 0, 1024: 0, 2048: 0};
-      msSeenTilesInRun = {256: 0, 512: 0, 1024: 0, 2048: 0};
-      reached2048InRun = false;
-      draw();
-      gameOverEl.style.display = 'none';
+    if (spots.length){
+      const [rr,cc] = spots[Math.floor(Math.random()*spots.length)];
+      grid[rr][cc] = 0;   // نفرّغ خانة من أصغر قيمة متاحة
       updateBest();
+      return;
     }
-    
-    function draw() {
-      gridEl.innerHTML = '';
-      scoreEl.textContent = score;
-      bestEl.textContent = best;
-      
-      const currentCounts = {256: 0, 512: 0, 1024: 0, 2048: 0};
-      
-      for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
-          const value = grid[r][c];
-          const cell = document.createElement('div');
-          cell.className = 'cell';
-          
-          if (value !== 0) {
-            const tile = document.createElement('div');
-            tile.className = `tile tile-${value}`;
-            tile.textContent = value;
-            cell.appendChild(tile);
-            
-            if (value === 256 || value === 512 || value === 1024 || value === 2048) {
-              currentCounts[value]++;
-            }
-            
-            if (value === 1024 && !shown1024Ad) {
-              shown1024Ad = true;
-              showTelegaAd(TELEG_UID_1024);
-            }
-            
-            if (value === 2048 && !shown2048Ad) {
-              shown2048Ad = true;
-              showTelegaAd(TELEG_UID_2048);
-            }
-          }
-          
-          gridEl.appendChild(cell);
-        }
-      }
-      
-      // معالجة المكافآت
-      [256, 512, 1024, 2048].forEach(ms => {
-        const prev = msSeenTilesInRun[ms] || 0;
-        const now = currentCounts[ms] || 0;
-        const delta = Math.max(0, now - prev);
-        
-        if (delta > 0) {
-          for (let i = 0; i < delta; i++) {
-            let tier = 'none';
-            if (msRunCount[ms] === 0) tier = 'full';
-            else if (reached2048InRun) tier = 'half';
-            
-            if (ms === 2048 && msRunCount[2048] === 0) reached2048InRun = true;
-            
-            msRunCount[ms]++;
-            
-            if (tier === 'full') offerAndMaybeAward(ms, 'full');
-            else if (tier === 'half') offerAndMaybeAward(ms, 'half');
-          }
-          msSeenTilesInRun[ms] = now;
-        } else {
-          msSeenTilesInRun[ms] = now;
-        }
-      });
+  }
+  // لو لأي سبب مفيش غير صفار (نادر جداً) مفيش حاجة نعملها
+}
+
+function endGame(){
+  // ✅ استخدم Extra Life تلقائيًا قبل أي إعلان
+const lives = getExtraLives();
+if (lives > 0) {
+  setExtraLives(lives - 1);     // استهلاك لايف واحد
+  reviveBoard();                // رجّع حركة
+  draw();
+  alert('🔥 Extra Life used! You are back in the game.');
+  return;                       // نرجع للعبة وممنسألش عن إعلان
+}
+
+  if(!continuedOnce){
+    const wantContinue=confirm("Game over! Your score: "+score+"\n\nWatch an ad to continue?");
+    if(wantContinue){
+      showRewardAd().then(ok=>{ if(ok){ continuedOnce=true; reviveBoard(); draw(); } else { showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score)); } });
+      return;
+    } else {
+      showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
+      return;
     }
-    
-    function slide(row) {
-      let filtered = row.filter(x => x !== 0);
-      let result = [];
-      let i = 0;
-      
-      while (i < filtered.length) {
-        if (i + 1 < filtered.length && filtered[i] === filtered[i + 1]) {
-          result.push(filtered[i] * 2);
-          score += filtered[i] * 2;
-          i += 2;
-        } else {
-          result.push(filtered[i]);
-          i += 1;
-        }
-      }
-      
-      while (result.length < size) {
-        result.push(0);
-      }
-      
-      return result;
-    }
-    
-    function rotate(times) {
-      for (let t = 0; t < times; t++) {
-        const newGrid = Array.from({length: size}, () => Array(size).fill(0));
-        for (let r = 0; r < size; r++) {
-          for (let c = 0; c < size; c++) {
-            newGrid[c][size - 1 - r] = grid[r][c];
-          }
-        }
-        grid = newGrid;
-      }
-    }
-    
-    function move(dir) {
-      const before = JSON.stringify(grid);
-      
-      if (dir === 2) rotate(2);
-      else if (dir === 1) rotate(3);
-      else if (dir === 3) rotate(1);
-      
-      for (let r = 0; r < size; r++) {
-        grid[r] = slide(grid[r]);
-      }
-      
-      if (dir === 2) rotate(2);
-      else if (dir === 1) rotate(1);
-      else if (dir === 3) rotate(3);
-      
-      const after = JSON.stringify(grid);
-      
-      if (before !== after) {
-        addTile();
-        updateBest();
-        draw();
-        if (gameOver()) endGame();
-      }
-    }
-    
-    function gameOver() {
-      if (randomEmpty()) return false;
-      
-      for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
-          const v = grid[r][c];
-          if (r + 1 < size && grid[r + 1][c] === v) return false;
-          if (c + 1 < size && grid[r][c + 1] === v) return false;
-        }
-      }
-      
-      return true;
-    }
-    
-    function updateBest() {
-      if (score > best) {
-        best = score;
-        localStorage.setItem('best2048', best);
-        bestEl.textContent = best;
-      }
-    }
-    
-    function reviveBoard() {
-      const pref = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048];
-      
-      for (const val of pref) {
-        const spots = [];
-        for (let r = 0; r < size; r++) {
-          for (let c = 0; c < size; c++) {
-            if (grid[r][c] === val) spots.push([r, c]);
-          }
-        }
-        
-        if (spots.length) {
-          const [rr, cc] = spots[Math.floor(Math.random() * spots.length)];
-          grid[rr][cc] = 0;
-          updateBest();
-          return;
-        }
-      }
-    }
-    
-    function offerAndMaybeAward(ms, tier) {
-      const base = baseRewards[ms];
-      if (!base) return;
-      
-      const amount = tier === 'full' ? base : base / 2;
-      
-      showMessage(
-        `تهانينا! لقد وصلت إلى ${ms}`,
-        `${tier === 'full' ? 'احصل على' : 'احصل على (نصف)'} $${amount.toFixed(4)} بمشاهدة إعلان؟`,
-        true
-      ).then(want => {
-        if (!want) return;
-        
-        showRewardAd().then(ok => {
-          if (!ok) return;
-          
-          setBalance(getBalance() + amount);
-          
-          if (ms === 512 || ms === 2048) {
-            setExtraLives(getExtraLives() + 1);
-          }
-          
-          showMessage(
-            "تمت إضافة المكافأة",
-            `تم إضافة $${amount.toFixed(4)} إلى رصيدك${(ms === 512 || ms === 2048) ? ' وحياة إضافية' : ''}`
-          );
-        });
-      });
-    }
-    
-    function endGame() {
-      finalScoreEl.textContent = score;
-      
-      // استخدام حياة إضافية تلقائياً إذا كانت متاحة
-      const lives = getExtraLives();
-      if (lives > 0) {
-        setExtraLives(lives - 1);
-        reviveBoard();
-        draw();
-        showMessage("حياة إضافية", "تم استخدام حياة إضافية واحدة! عدت إلى اللعبة.");
-        return;
-      }
-      
-      if (!continuedOnce) {
-        showMessage(
-          "انتهت اللعبة!",
-          `نقاطك: ${score}\nشاهد إعلان للاستمرار؟`,
-          true
-        ).then(wantContinue => {
-          if (wantContinue) {
-            showRewardAd().then(ok => {
-              if (ok) {
-                continuedOnce = true;
-                reviveBoard();
-                draw();
-              } else {
-                showInterstitialAd().finally(() => {
-                  gameOverEl.style.display = 'flex';
-                });
-              }
-            });
-          } else {
-            showInterstitialAd().finally(() => {
-              gameOverEl.style.display = 'flex';
-            });
-          }
-        });
-        return;
-      }
-      
-      showInterstitialAd().finally(() => {
-        gameOverEl.style.display = 'flex';
-      });
-    }
-    
-    // ===== واجهة المستخدم والتحكم =====
-    function showMessage(title, text, showCancel = false) {
-      return new Promise(resolve => {
-        document.getElementById('msgTitle').textContent = title;
-        document.getElementById('msgText').textContent = text;
-        
-        const msgBox = document.getElementById('messageBox');
-        const overlay = document.getElementById('overlay');
-        const okBtn = document.getElementById('msgOk');
-        const cancelBtn = document.getElementById('msgCancel');
-        
-        cancelBtn.style.display = showCancel ? 'block' : 'none';
-        
-        const handler = result => {
-          msgBox.classList.remove('open');
-          overlay.classList.remove('open');
-          okBtn.removeEventListener('click', okHandler);
-          cancelBtn.removeEventListener('click', cancelHandler);
-          resolve(result);
-        };
-        
-        const okHandler = () => handler(true);
-        const cancelHandler = () => handler(false);
-        
-        okBtn.addEventListener('click', okHandler);
-        cancelBtn.addEventListener('click', cancelHandler);
-        
-        msgBox.classList.add('open');
-        overlay.classList.add('open');
-      });
-    }
-    
-    // أحداث السحب والتحريك
-    const startPos = {x: 0, y: 0};
-    let dragging = false;
-    
-    function touchStart(e) {
-      dragging = true;
-      const t = e.touches ? e.touches[0] : e;
-      startPos.x = t.clientX;
-      startPos.y = t.clientY;
-      e.preventDefault();
-    }
-    
-    function touchEnd(e) {
-      if (!dragging) return;
-      dragging = false;
-      
-      const t = e.changedTouches ? e.changedTouches[0] : e;
-      const dx = t.clientX - startPos.x;
-      const dy = t.clientY - startPos.y;
-      
-      if (Math.abs(dx) > Math.abs(dy)) {
-        move(dx > 0 ? 2 : 0);
-      } else {
-        move(dy > 0 ? 3 : 1);
-      }
-      
-      e.preventDefault();
-    }
-    
-    // تهيئة الأحداث
-    function initEvents() {
-      // أحداث السحب
-      gridEl.addEventListener('touchstart', touchStart, {passive: false});
-      gridEl.addEventListener('touchend', touchEnd, {passive: false});
-      gridEl.addEventListener('mousedown', touchStart);
-      gridEl.addEventListener('mouseup', touchEnd);
-      
-      // أزرار التحكم
-      document.getElementById('left').addEventListener('click', () => move(0));
-      document.getElementById('up').addEventListener('click', () => move(1));
-      document.getElementById('right').addEventListener('click', () => move(2));
-      document.getElementById('down').addEventListener('click', () => move(3));
-      
-      // القائمة
-      const menuBtn = document.getElementById('menuBtn');
-      const closeMenu = document.getElementById('closeMenu');
-      const overlay = document.getElementById('overlay');
-      const menu = document.getElementById('menu');
-      
-      menuBtn.addEventListener('click', () => {
-        menu.classList.add('open');
-        overlay.classList.add('open');
-      });
-      
-      closeMenu.addEventListener('click', closeMenuFunc);
-      overlay.addEventListener('click', closeMenuFunc);
-      
-      function closeMenuFunc() {
-        menu.classList.remove('open');
-        overlay.classList.remove('open');
-      }
-      
-      // عناصر القائمة
-      document.getElementById('mNew').addEventListener('click', () => {
-        closeMenuFunc();
-        setup();
-      });
-      
-      document.getElementById('mInvite').addEventListener('click', () => {
-        closeMenuFunc();
-        prompt('انسخ الرابط:', 'https://t.me/Smart2048_bot');
-      });
-      
-      document.getElementById('mShare').addEventListener('click', () => {
-        closeMenuFunc();
-        const text = `حصلت على ${score} نقطة في 2048 Mini!`;
-        if (navigator.share) {
-          navigator.share({ text });
-        } else {
-          prompt('انسخ ونشر نتيجتك:', text);
-        }
-      });
-      
-      document.getElementById('mClaim').addEventListener('click', () => {
-        closeMenuFunc();
-        const amount = (getBalance()).toFixed(4);
-        const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'unknown';
-        const username = window.Telegram?.WebApp?.initDataUnsafe?.user?.username || 'unknown';
-        
-        showMessage(
-          "طلب سحب",
-          `سيتم إرسال طلب سحب بقيمة $${amount} إلى الإدارة للمراجعة.`,
-          true
-        ).then(confirm => {
-          if (confirm) {
-            // محاكاة إرسال الطلب
-            setTimeout(() => {
-              showMessage("تم إرسال الطلب", "تم إرسال طلب السحب بنجاح وسيتم المراجعة خلال 24 ساعة.");
-              setBalance(0);
-            }, 1000);
-          }
-        });
-      });
-      
-      document.getElementById('mAbout').addEventListener('click', () => {
-        closeMenuFunc();
-        showMessage(
-          "عن اللعبة",
-          `لعبة 2048 Mini مع مكافآت USDT!\n\n` +
-          `- عند الوصول إلى 256/512/1024/2048 احصل على مكافآت USDT\n` +
-          `- 512 و 2048 يمنحان حياة إضافية\n` +
-          `- اسحب رصيدك عند الوصول إلى 1.0000 USDT\n` +
-          `- إعلانات Telega.io تدعم اللعبة`
-        );
-      });
-      
-      // إعادة المحاولة
-      document.getElementById('tryAgain').addEventListener('click', setup);
-    }
-    
-    // ===== بدء التشغيل =====
-    function init() {
-      console.log("جاري تهيئة اللعبة...");
-      initTelega();
-      initEvents();
-      setup();
-      updateBalanceUI();
-      updateLivesUI();
-      
-      // توسيع تطبيق Telegram إذا كان يعمل داخله
-      try {
-        if (window.Telegram && window.Telegram.WebApp) {
-          window.Telegram.WebApp.expand();
-          console.log("تم توسيع تطبيق Telegram WebApp");
-        }
-      } catch (e) {
-        console.warn("لا يعمل في بيئة Telegram");
-      }
-      
-      console.log("تم تهيئة اللعبة بنجاح");
-    }
-    
-    // بدء التشغيل عند تحميل الصفحة
-    window.addEventListener('load', init);
-  </script>
+  }
+  showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
+}
+
+/* ابدأ اللعبة بعد ما الصفحة تجهز */
+/* ابدأ اللعبة + عرض Daily Bonus */
+window.addEventListener('load', () => {
+  setup();
+  setTimeout(maybeOfferDailyBonusInt, 1500); // بعد ثانية ونص من بداية اللعبة
+});
+
+</script>
 </body>
 </html>
