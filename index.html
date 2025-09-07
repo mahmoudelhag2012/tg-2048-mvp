@@ -7,8 +7,7 @@
 
   <!-- Telegram Mini App SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <!-- (اختياري) AdsGram SDK: ممكن تسيبه أو تشيله، مش مستخدم دلوقتي -->
-  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+ 
   <!-- Telega.io SDK -->
   <script src="https://inapp.telega.io/sdk/v1/sdk.js"></script>
 
@@ -113,36 +112,78 @@ window.addEventListener('error', e => { try{ console.warn(e.message); }catch(_){
 /* ===== Telegram ===== */
 try{ const tg = window.Telegram?.WebApp; if (tg) tg.expand(); }catch(_){}
 
-/* ===== Telega: init + helpers ===== */
-let telegaAds=null;
-try{
-  if (window.TelegaIn && window.TelegaIn.AdsController) {
-    telegaAds = window.TelegaIn.AdsController.create_miniapp({
-      token: 'a14e3947-839f-4b2a-aee0-5a3b1412c818'
-    });
-  }
-}catch(_){}
+// ===== Telega setup (robust) =====
+let telegaReady = false;
+let telegaAds = null;
 
-/* UIDs (Milestones) */
-const TELEG_UID_1024="3a1f1a7a-028c-4909-b20b-f4733d02fcc5";
-const TELEG_UID_2048="6a5cb9ac-15d0-4da2-bbca-916236f1bc83";
+// توكن الميني-آب (من صفحة Mini App Details)
+const TELEG_TOKEN = 'a14e3947-839f-4b2a-aee0-5a3b1412c818';
 
-/* ✅ UIDs (NEW): Interstitial + Reward من الصورة اللي بعتّها */
-const TELEG_UID_INTERSTITIAL = "a6dfc97b-3664-4dfd-9fa0-93442843a96e";
-const TELEG_UID_REWARD       = "783d2b04-7125-44d2-a92f-f43d6e639e40";
+// UUIDs الحقيقية من صورك
+const TELEG_UID_INTERSTITIAL = 'a6dfc97b-3664-4dfd-9fa0-93442843a96e';
+const TELEG_UID_REWARD       = '783d2b04-7125-44d2-a92f-f43d6e639e40';
 
-/* دالة عامة لعرض بلوك Telega بالـUUID */
-function showTelega(uid){
+// تأكيد تليجرام جاهز (اختياري)
+try { const tg = window.Telegram?.WebApp; tg?.ready?.(); tg?.expand?.(); } catch(_){}
+
+// ننتظر SDK لحد ما window.ads / AdsController يظهروا
+function waitForTelegaSDK(timeoutMs = 5000){
+  return new Promise(resolve=>{
+    const start = Date.now();
+    (function tick(){
+      if (window.TelegaIn?.AdsController && window.ads?.ad_show) return resolve(true);
+      if (Date.now() - start > timeoutMs) return resolve(false);
+      requestAnimationFrame(tick);
+    })();
+  });
+}
+
+async function ensureTelega(){
+  if (telegaReady) return true;
+  const ok = await waitForTelegaSDK();
+  if (!ok) { console.warn('Telega SDK not ready (هل بتجرب في كروم؟ لازم تفتح جوه تليجرام).'); return false; }
   try{
-    if (window.ads && typeof window.ads.ad_show==="function") {
-      return window.ads.ad_show({ adBlockUuid: uid });
+    telegaAds = telegaAds || window.TelegaIn.AdsController.create_miniapp({ token: TELEG_TOKEN });
+    telegaReady = true;
+    return true;
+  }catch(e){
+    console.warn('Telega init error:', e);
+    return false;
+  }
+}
+
+// دالة عامة لعرض أي بلوك بالـ UUID
+async function showTelega(adUuid){
+  const ok = await ensureTelega();
+  if (!ok) return Promise.reject(new Error('SDK not ready'));
+  try{
+    if (typeof window.ads?.ad_show === 'function'){
+      return window.ads.ad_show({ adBlockUuid: adUuid });
     }
-    if (telegaAds && typeof telegaAds.show==="function") {
+    if (typeof telegaAds?.show === 'function'){
+      // fallback عام
       return telegaAds.show();
     }
-  }catch(e){ console.warn("Telega show error:",e); }
-  return Promise.resolve();
+  }catch(e){
+    console.warn('Telega show error:', e);
+    return Promise.reject(e);
+  }
+  return Promise.reject(new Error('No show method'));
 }
+
+// ========= بدائل الدوال القديمة =========
+function showInterstitialAd(){
+  // إعلان عادي (Interstitial)
+  return showTelega(TELEG_UID_INTERSTITIAL);
+}
+
+function showRewardAd(){
+  // إعلان مُكافأة (اعتبر النجاح = resolve(true) لو اشتغل بدون Error)
+  return new Promise(resolve=>{
+    showTelega(TELEG_UID_REWARD).then(()=>resolve(true)).catch(()=>resolve(false));
+  });
+}
+
 
 /* ===== Splash ===== */
 const SPLASH_IMG_URL = "https://raw.githubusercontent.com/mahmoudelhag2012/tg-2048-mvp/main/splash-usdt-2048.png";
