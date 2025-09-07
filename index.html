@@ -7,8 +7,6 @@
 
   <!-- Telegram Mini App SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <!-- AdsGram SDK -->
-  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
   <!-- Telega.io SDK -->
   <script src="https://inapp.telega.io/sdk/v1/sdk.js"></script>
 
@@ -116,22 +114,68 @@ window.addEventListener('error', e => { try{ console.warn(e.message); }catch(_){
 /* ===== Telegram ===== */
 try{ const tg = window.Telegram?.WebApp; if (tg) tg.expand(); }catch(_){}
 
-/* ===== Telega helpers (محاطة بـ try) ===== */
-let telegaAds=null;
-try{
+/* ===== Telega.io SDK ===== */
+let telegaAds = null;
+let telegaRewarded = null;
+
+try {
   if (window.TelegaIn && window.TelegaIn.AdsController) {
     telegaAds = window.TelegaIn.AdsController.create_miniapp({
-      token: 'a14e3947-839f-4b2a-aee0-5a3b1412c818'
+      token: 'a1de3947-839f-4b2a-aee0-5a3b1412c818'
+    });
+    
+    telegaRewarded = window.TelegaIn.RewardedController.create_miniapp({
+      token: 'a1de3947-839f-4b2a-aee0-5a3b1412c818'
     });
   }
-}catch(_){}
-const TELEG_UID_1024="3a1f1a7a-028c-4909-b20b-f4733d02fcc5";
-const TELEG_UID_2048="6a5cb9ac-15d0-4da2-bbca-916236f1bc83";
-function showTelega(uid){
-  try{
-    if (window.ads && typeof window.ads.ad_show==="function") return window.ads.ad_show({adBlockUuid:uid});
-    if (telegaAds && typeof telegaAds.show==="function") return telegaAds.show();
-  }catch(e){console.warn("Telega show error:",e)}
+} catch(e) {
+  console.warn("Telega.io SDK error:", e);
+}
+
+// تعريف معرفات الإعلانات الخاصة بـ Telega.io
+const TELEG_UID_1024 = "3a1f1a7a-028c-4909-b20b-f4733d02fcc5";
+const TELEG_UID_2048 = "6a5cb9ac-15d0-4da2-bbca-916236f1be83";
+
+// وظائف عرض الإعلانات
+function showInterstitialAd() {
+  try {
+    if (telegaAds && typeof telegaAds.show === "function") {
+      return telegaAds.show().catch(() => {});
+    }
+  } catch(e) {
+    console.warn("Telega interstitial error:", e);
+  }
+  return Promise.resolve();
+}
+
+function showRewardAd() {
+  return new Promise((resolve) => {
+    try {
+      if (telegaRewarded && typeof telegaRewarded.show === "function") {
+        telegaRewarded.show()
+          .then(() => resolve(true))
+          .catch(() => resolve(false));
+      } else {
+        resolve(false);
+      }
+    } catch(e) {
+      console.warn("Telega rewarded error:", e);
+      resolve(false);
+    }
+  });
+}
+
+function showTelega(uid) {
+  try {
+    if (window.ads && typeof window.ads.ad_show === "function") {
+      return window.ads.ad_show({adBlockUuid: uid});
+    }
+    if (telegaAds && typeof telegaAds.show === "function") {
+      return telegaAds.show();
+    }
+  } catch(e) {
+    console.warn("Telega show error:", e);
+  }
   return Promise.resolve();
 }
 
@@ -200,11 +244,7 @@ document.getElementById('mClaim').onclick = () => {
   document.getElementById('mClaim').style.display = 'none';
 })
 .catch(()=> alert("❌ حصل خطأ، جرّب تاني"));
-
-
 };
-
-
 
 /* ====== Daily Bonus via Interstitial (مرّة يوميًا) ====== */
 const DAILY_BONUS_AMOUNT = 0.0001;      // مبلغ صغير جدًا
@@ -255,33 +295,6 @@ const baseRewards={256:0.0002,512:0.0003,1024:0.0015,2048:0.002};
 let msRunCount={256:0,512:0,1024:0,2048:0};
 let msSeenTilesInRun={256:0,512:0,1024:0,2048:0};
 let reached2048InRun=false;
-
-/* AdsGram */
-let AdController=null, RewardController=null;
-try{
-  if(window.Adsgram&&typeof window.Adsgram.init==="function"){
-    AdController=window.Adsgram.init({blockId:"int-14155"});
-    RewardController=window.Adsgram.init({blockId:"14159"});
-  }
-}catch(_){}
-function showInterstitialAd(){ try{ if(!AdController||typeof AdController.show!=="function")return Promise.resolve(); return AdController.show().catch(()=>{});}catch(_){return Promise.resolve();} }
-function showRewardAd(){ try{ if(!RewardController||typeof RewardController.show!=="function")return Promise.resolve(false); return RewardController.show().then(()=>true).catch(()=>false);}catch(_){return Promise.resolve(false);} }
-
-function offerAndMaybeAward(ms,tier){
-  const base=baseRewards[ms]; if(!base) return;
-  const amount=tier==='full'?base:base/2;
-  const want=confirm(`Milestone ${ms} reached!\n${tier==='full'?'Claim ':'Claim (half) '}$${amount.toFixed(4)} by watching an ad?\nOK = Watch & claim,  Cancel = Skip`);
-  if(!want) return;
-  showRewardAd().then(ok=>{
-    if(!ok) return;
-    setBalance(getBalance()+amount);
-   if (ms === 512 || ms === 2048) {
-  setExtraLives(getExtraLives() + 1);   // تخزين دائم
-}
-
-    alert(`✅ Reward added: $${amount.toFixed(4)}${(ms===512||ms===2048)?' + Extra Life':''}`);
-  });
-}
 
 let continuedOnce=false, shown1024Ad=false, shown2048Ad=false;
 
@@ -410,6 +423,22 @@ if (lives > 0) {
     }
   }
   showInterstitialAd().finally(()=> alert("Game ended! Final score: " + score));
+}
+
+function offerAndMaybeAward(ms,tier){
+  const base=baseRewards[ms]; if(!base) return;
+  const amount=tier==='full'?base:base/2;
+  const want=confirm(`Milestone ${ms} reached!\n${tier==='full'?'Claim ':'Claim (half) '}$${amount.toFixed(4)} by watching an ad?\nOK = Watch & claim,  Cancel = Skip`);
+  if(!want) return;
+  showRewardAd().then(ok=>{
+    if(!ok) return;
+    setBalance(getBalance()+amount);
+   if (ms === 512 || ms === 2048) {
+  setExtraLives(getExtraLives() + 1);   // تخزين دائم
+}
+
+    alert(`✅ Reward added: $${amount.toFixed(4)}${(ms===512||ms===2048)?' + Extra Life':''}`);
+  });
 }
 
 /* ابدأ اللعبة بعد ما الصفحة تجهز */
